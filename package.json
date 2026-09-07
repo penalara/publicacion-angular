@@ -1,0 +1,27 @@
+{
+  "name": "@penalara/publicacion-angular",
+  "version": "1.0.0",
+  "description": "Publicador configurable de aplicaciones Angular mediante FTP o SFTP",
+  "type": "module",
+  "bin": {
+    "penalara-publicacion": "bin/penalara-publicacion.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "basic-ftp": "6.2.1",
+    "semver": "7.7.4"
+  }
+}
