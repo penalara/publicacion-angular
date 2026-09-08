@@ -118,7 +118,7 @@ sftp web-production
 
 ## 7. Ramas y VCS
 
-La publicación exige un workspace limpio. La rama de publicación debe existir localmente o en el remoto configurado. Git usa un merge `--no-ff`; Mercurial crea un changeset de merge. El árbol resultante debe coincidir exactamente con la revisión origen.
+La publicación exige un workspace limpio. La rama de publicación debe existir localmente o en el remoto configurado. Antes de conectar, el publicador compara esa rama con su ancestro común y rechaza cualquier cambio de contenido propio. El merge real se aplaza hasta completar el despliegue remoto. Git usa un merge `--no-ff`; Mercurial crea un changeset de merge. El árbol resultante se vuelve a comparar y debe coincidir exactamente con la revisión origen.
 
 El tag de `--new-version` es `${name}-${version}`, donde `name` procede del `package.json`, no del identificador de proyecto usado para credenciales.
 

@@ -39,6 +39,21 @@ test('Git prepara version, tag y merge con el mismo arbol', {
     await vcs.createTag('example-1.1.0');
     const sourceRevision = await vcs.revision();
     await vcs.checkout('publication');
+    await writeFile(join(cwd, 'publication-only.txt'), 'must be reconciled\n');
+    await runProcess('git', ['add', 'publication-only.txt'], { cwd });
+    await runProcess('git', ['commit', '-m', 'Publication-only change'], { cwd });
+    await vcs.checkout('main');
+    await assert.rejects(
+      vcs.assertMergePreservesSource('publication', sourceRevision),
+      /contiene cambios de contenido/u,
+    );
+    await vcs.checkout('publication');
+    await rm(join(cwd, 'publication-only.txt'));
+    await runProcess('git', ['add', '--all'], { cwd });
+    await runProcess('git', ['commit', '-m', 'Reconcile publication content'], { cwd });
+    await vcs.checkout('main');
+    await vcs.assertMergePreservesSource('publication', sourceRevision);
+    await vcs.checkout('publication');
     await vcs.merge(sourceRevision);
     assert.equal(await vcs.treeMatches(sourceRevision), true);
     await vcs.commitPublication('Publicamos version 1.1.0 en Testing');
@@ -71,6 +86,21 @@ test('Mercurial prepara version, tag y merge con el mismo arbol', {
     await vcs.commitVersion(packagePath, 'Preparamos version 1.1.0');
     await vcs.createTag('example-1.1.0');
     const sourceRevision = await vcs.revision();
+    await vcs.checkout('publication');
+    await writeFile(join(cwd, 'publication-only.txt'), 'must be reconciled\n');
+    await runProcess('hg', ['add', 'publication-only.txt'], { cwd });
+    await runProcess('hg', ['commit', '-m', 'Publication-only change'], { cwd });
+    await vcs.checkout('default');
+    await assert.rejects(
+      vcs.assertMergePreservesSource('publication', sourceRevision),
+      /contiene cambios de contenido/u,
+    );
+    await vcs.checkout('publication');
+    await rm(join(cwd, 'publication-only.txt'));
+    await runProcess('hg', ['remove', '--after', 'publication-only.txt'], { cwd });
+    await runProcess('hg', ['commit', '-m', 'Reconcile publication content'], { cwd });
+    await vcs.checkout('default');
+    await vcs.assertMergePreservesSource('publication', sourceRevision);
     await vcs.checkout('publication');
     await vcs.merge(sourceRevision);
     assert.equal(await vcs.treeMatches(sourceRevision), true);

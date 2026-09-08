@@ -33,11 +33,11 @@ The project identifier selects FTP credentials. The environment selects an entry
 
 This is the default unless the command starts from the configured `versionBranch`. When no version is supplied, the CLI displays the current version and suggests the next SemVer `patch`. Press Enter to accept it. Non-interactive processes must provide the version explicitly.
 
-The build and tests run after changing `package.json` but before creating history. A failure restores the file exactly. Success creates `Preparamos version <version>`, tags it as `<name>-<version>`, merges it into `publicationBranch`, and creates `Publicamos version <version> en <environment>` before deployment.
+The build and tests run after changing `package.json` but before creating history. A failure restores the file exactly. Success creates `Preparamos version <version>` and tags it as `<name>-<version>`. The tool then verifies without changing the workspace that the publication branch adds no content after the common ancestor, completes the remote deployment and log, merges into `publicationBranch`, creates `Publicamos version <version> en <environment>`, and finally pushes.
 
 ### `--no-version`
 
-This mode uses the current valid SemVer from `package.json`. It rejects a positional version and creates neither a version commit nor a tag. Build and tests still run before switching branches or creating publication history.
+This mode uses the current valid SemVer from `package.json`. It rejects a positional version and creates neither a version commit nor a tag. Build, tests, merge prevalidation, and remote deployment all complete before switching branches or creating publication history.
 
 ### Automatic selection
 
@@ -50,7 +50,7 @@ This mode uses the current valid SemVer from `package.json`. It rejects a positi
 
 Git treats `main` and `master` as standard source branches; Mercurial uses `default`. Any other source requires interactive confirmation or `--allow-nonstandard-source`. A configured `versionBranch` is explicitly authorized.
 
-Running directly from `publicationBranch` also requires confirmation and produces an empty publication commit. The publication branch must already exist. Merge conflicts or a merged tree that differs from the source abort the release.
+Running directly from `publicationBranch` also requires confirmation and produces an empty publication commit. The publication branch must already exist. Before connecting, the tool rejects a publication branch containing content changes after the common ancestor. The actual merge runs only after remote deployment succeeds, and its resulting tree is checked again before commit.
 
 ## 6. Transfer and activation
 
@@ -61,6 +61,8 @@ All artifacts are uploaded as `<language>_new` before any active directory chang
 `--resume` continues a locally prepared release. New-version mode validates its local tag; no-version mode validates the prepared publication commit. Push only happens after deployment and remote logging succeed.
 
 If the final push alone fails, deployment is already active. Follow the reported manual push instruction instead of publishing again.
+
+If the final merge fails unexpectedly after passing prevalidation, remote deployment is already active, but no publication commit or push is created. Inspect both repository and remote state before continuing.
 
 Git pushes source branch, publication branch, and tag atomically. Mercurial performs one `hg push`. The tool returns to the original branch after success or failure whenever possible.
 

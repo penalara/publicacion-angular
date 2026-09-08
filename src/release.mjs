@@ -169,9 +169,18 @@ export async function runRelease({
     }
 
     const sourceRevision = await vcs.revision();
-    let publicationState;
+    if (config.publicationBranch && config.publicationBranch !== sourceBranch) {
+      await vcs.assertMergePreservesSource(
+        config.publicationBranch,
+        sourceRevision,
+        remote,
+      );
+    }
+    const revision = await vcs.shortRevision();
+    const transport = transportFactory(config);
     try {
-      publicationState = await preparePublicationCommit({
+      await deployPublication({ config, version, revision, artifacts, transport, log });
+      const publicationState = await preparePublicationCommit({
         config,
         vcs,
         sourceBranch,
@@ -180,9 +189,6 @@ export async function runRelease({
         resume,
         remote,
       });
-      const revision = await vcs.shortRevision();
-      const transport = transportFactory(config);
-      await deployPublication({ config, version, revision, artifacts, transport, log });
       try {
         await vcs.push({
           remote,

@@ -7,7 +7,7 @@
 ### Instalación
 
 ```bash
-npm install --save-dev --save-exact @penalara/publicacion-angular@1.0.0
+npm install --save-dev --save-exact @penalara/publicacion-angular@1.0.1
 ```
 
 El paquete expone el binario `penalara-publicacion`:
@@ -89,7 +89,7 @@ Este proyecto se distribuye bajo la [licencia MIT](LICENSE).
 ### Installation
 
 ```bash
-npm install --save-dev --save-exact @penalara/publicacion-angular@1.0.0
+npm install --save-dev --save-exact @penalara/publicacion-angular@1.0.1
 ```
 
 The package exposes the `penalara-publicacion` binary. Store its configuration in `tools/publicacion/publicacion.config.json`; the generic example above uses FTP for testing and SFTP for production.

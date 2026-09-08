@@ -44,13 +44,42 @@ export class MercurialVcs {
   }
 
   async checkout(branch) {
-    const heads = (await this.#hg(['heads', branch, '--template', '{node}\n'])).stdout
-      .split(/\r?\n/u)
-      .filter(Boolean);
-    if (heads.length !== 1) {
-      throw new Error(`La rama Mercurial "${branch}" debe tener exactamente una cabeza abierta.`);
-    }
+    await this.#branchHead(branch);
     await this.#hg(['update', branch], { stdio: 'inherit' });
+  }
+
+  async assertMergePreservesSource(publicationBranch, sourceRevision) {
+    const publicationRevision = await this.#branchHead(publicationBranch);
+    let ancestor;
+    try {
+      ancestor = (await this.#hg([
+        'log',
+        '-r',
+        `ancestor(${sourceRevision}, ${publicationRevision})`,
+        '--template',
+        '{node}',
+      ])).stdout.trim();
+      if (ancestor === '') {
+        throw new Error('Mercurial no devolvio un ancestro comun.');
+      }
+    } catch (error) {
+      throw new Error(
+        `La rama de publicacion "${publicationBranch}" no comparte un ancestro valido con la rama origen.`,
+        { cause: error },
+      );
+    }
+    const differences = (await this.#hg([
+      'status',
+      '--rev',
+      ancestor,
+      '--rev',
+      publicationRevision,
+    ])).stdout.trim();
+    if (differences !== '') {
+      throw new Error(
+        `La rama de publicacion "${publicationBranch}" contiene cambios de contenido posteriores al ancestro comun. Fusione o resuelva esos cambios antes de publicar.`,
+      );
+    }
   }
 
   async commitVersion(packagePath, message) {
@@ -106,5 +135,15 @@ export class MercurialVcs {
 
   async push({ remote = this.defaultRemote }) {
     await this.#hg(['push', remote], { stdio: 'inherit' });
+  }
+
+  async #branchHead(branch) {
+    const heads = (await this.#hg(['heads', branch, '--template', '{node}\n'])).stdout
+      .split(/\r?\n/u)
+      .filter(Boolean);
+    if (heads.length !== 1) {
+      throw new Error(`La rama Mercurial "${branch}" debe tener exactamente una cabeza abierta.`);
+    }
+    return heads[0];
   }
 }

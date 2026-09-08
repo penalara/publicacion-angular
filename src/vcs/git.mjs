@@ -73,6 +73,54 @@ export class GitVcs {
     await this.#git(['checkout', '--track', '-b', branch, `${remote}/${branch}`], { stdio: 'inherit' });
   }
 
+  async assertMergePreservesSource(publicationBranch, sourceRevision, remote = this.defaultRemote) {
+    const local = await this.#git(
+      ['show-ref', '--verify', '--quiet', `refs/heads/${publicationBranch}`],
+      { allowedExitCodes: [0, 1] },
+    );
+    const localRef = `refs/heads/${publicationBranch}`;
+    const remoteRef = `refs/remotes/${remote}/${publicationBranch}`;
+    const remoteBranch = await this.#git(
+      ['show-ref', '--verify', '--quiet', remoteRef],
+      { allowedExitCodes: [0, 1] },
+    );
+    let publicationRef = local.exitCode === 0 ? localRef : remoteRef;
+    if (local.exitCode === 0 && remoteBranch.exitCode === 0) {
+      const localIsAncestor = await this.#git(
+        ['merge-base', '--is-ancestor', localRef, remoteRef],
+        { allowedExitCodes: [0, 1] },
+      );
+      const remoteIsAncestor = await this.#git(
+        ['merge-base', '--is-ancestor', remoteRef, localRef],
+        { allowedExitCodes: [0, 1] },
+      );
+      if (localIsAncestor.exitCode === 0) publicationRef = remoteRef;
+      else if (remoteIsAncestor.exitCode !== 0) {
+        throw new Error(
+          `La rama local de publicacion "${publicationBranch}" ha divergido de "${remote}/${publicationBranch}".`,
+        );
+      }
+    }
+    let ancestor;
+    try {
+      ancestor = (await this.#git(['merge-base', sourceRevision, publicationRef])).stdout.trim();
+    } catch (error) {
+      throw new Error(
+        `La rama de publicacion "${publicationBranch}" no comparte un ancestro valido con la rama origen.`,
+        { cause: error },
+      );
+    }
+    const comparison = await this.#git(
+      ['diff', '--quiet', ancestor, publicationRef, '--'],
+      { allowedExitCodes: [0, 1] },
+    );
+    if (comparison.exitCode !== 0) {
+      throw new Error(
+        `La rama de publicacion "${publicationBranch}" contiene cambios de contenido posteriores al ancestro comun. Fusione o resuelva esos cambios antes de publicar.`,
+      );
+    }
+  }
+
   async commitVersion(packagePath, message) {
     const path = relative(this.#cwd, packagePath).replaceAll('\\', '/');
     await this.#git(['add', '--', path]);

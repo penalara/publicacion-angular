@@ -42,16 +42,18 @@ El orden es:
 3. Restaurar `package.json` y terminar si falla el script.
 4. Crear `Preparamos version <versión>` en la rama origen.
 5. Crear `<name>-<versión>` sobre ese commit.
-6. Fusionar el origen en `publicationBranch`.
-7. Verificar que el árbol fusionado coincide con el origen.
-8. Crear `Publicamos version <versión> en <entorno>`.
-9. Desplegar, registrar y hacer push.
+6. Comprobar sin modificar el workspace que la rama de publicación no aporta cambios respecto al ancestro común.
+7. Transferir y activar los artefactos y actualizar el registro remoto.
+8. Fusionar el origen en `publicationBranch`.
+9. Verificar que el árbol fusionado coincide con el origen.
+10. Crear `Publicamos version <versión> en <entorno>`.
+11. Hacer push.
 
 ### `--no-version`
 
 Usa la versión SemVer actual de `package.json`. No acepta una versión posicional, no modifica el fichero, no crea un commit de preparación y no crea ni exige un tag.
 
-El build y las pruebas se ejecutan antes de cambiar de rama. Si terminan correctamente, se fusiona el origen, se crea el commit de publicación y se despliega.
+El build y las pruebas se ejecutan antes de cambiar de rama. Si terminan correctamente, se prevalida el merge y se completa el despliegue remoto. Solo entonces se fusiona el origen, se crea el commit de publicación y se hace push.
 
 ### Selección automática
 
@@ -66,7 +68,7 @@ Git considera estándar `main` y `master`; Mercurial considera estándar `defaul
 
 Si el origen coincide con `publicationBranch`, se pide confirmación y se crea un commit vacío de publicación. En automatización se usa `--allow-nonstandard-source` para autorizar esta situación.
 
-La rama de publicación debe existir. El publicador nunca la crea. Un conflicto o un árbol fusionado diferente del origen abortan el merge y el despliegue.
+La rama de publicación debe existir. El publicador nunca la crea. Antes de conectar se rechaza una rama de publicación que contenga cambios respecto al ancestro común, porque el merge no conservaría exactamente el árbol validado en origen. El merge real se ejecuta únicamente después de completar el despliegue remoto.
 
 ## 6. Transferencia y activación
 
@@ -83,6 +85,8 @@ Si falla el último paso se intenta restaurar la versión anterior. No deben eje
 `--resume` reanuda un release preparado localmente después de un fallo. En `--new-version` verifica la versión y el tag local. En `--no-version` reutiliza el commit de publicación cuando coincide con el origen y el entorno.
 
 Si falla únicamente el push final, el despliegue ya está activo. No repita la publicación: ejecute manualmente el push indicado por el error.
+
+Si el merge final falla de forma inesperada después de superar la prevalidación, el despliegue remoto ya está activo, pero no se crea el commit de publicación ni se hace push. Revise el repositorio y el estado remoto antes de continuar.
 
 ## 8. Resultado y retorno
 

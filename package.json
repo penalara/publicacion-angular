@@ -1,6 +1,6 @@
 {
   "name": "@penalara/publicacion-angular",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Publicador configurable de aplicaciones Angular mediante FTP o SFTP",
   "type": "module",
   "bin": {

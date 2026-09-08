@@ -23,6 +23,7 @@ class FakeVcs {
   async createTag(tag) { this.tags.add(tag); this.events.push(`tag:${tag}`); }
   async revision() { return 'source-revision'; }
   async shortRevision() { return 'publication'; }
+  async assertMergePreservesSource() { this.events.push('preflight-merge'); }
   async checkout(branch) { this.branch = branch; this.events.push(`checkout:${branch}`); }
   async merge() { this.events.push('merge'); }
   async treeMatches() { return true; }
@@ -55,7 +56,7 @@ async function fixture(callback) {
   }
 }
 
-test('build precede commit, tag, merge, deploy y push', async () => {
+test('build y despliegue preceden al merge y al push', async () => {
   await fixture(async (cwd) => {
     const vcs = new FakeVcs();
     await runRelease({
@@ -77,10 +78,11 @@ test('build precede commit, tag, merge, deploy y push', async () => {
       'only-package',
       'Preparamos version 1.1.0',
       'tag:example-app-1.1.0',
+      'preflight-merge',
+      'deploy',
       'checkout:publication-testing',
       'merge',
       'Publicamos version 1.1.0 en Testing',
-      'deploy',
       'push',
       'checkout:main',
     ]);
@@ -124,5 +126,94 @@ test('no-version omite commit de version y tag', async () => {
     assert.equal(vcs.events.includes('Preparamos version 1.0.0'), false);
     assert.equal(vcs.events.some((event) => event.startsWith('tag:')), false);
     assert(vcs.events.indexOf('build') < vcs.events.indexOf('merge'));
+    assert(vcs.events.indexOf('deploy') < vcs.events.indexOf('merge'));
+  });
+});
+
+test('un fallo de conexion no cambia a la rama de publicacion ni crea su merge', async () => {
+  await fixture(async (cwd) => {
+    const vcs = new FakeVcs();
+    await assert.rejects(
+      runRelease({
+        config,
+        vcs,
+        mode: 'new-version',
+        requestedVersion: '1.1.0',
+        cwd,
+        build: async () => { vcs.events.push('build'); },
+        findArtifacts: async () => [{ name: 'es', localDirectory: '/tmp/es' }],
+        transportFactory: () => ({}),
+        deployPublication: async () => {
+          vcs.events.push('connect-failed');
+          throw new Error('connect ETIMEDOUT');
+        },
+        log() {},
+      }),
+      /ETIMEDOUT/u,
+    );
+    assert.deepEqual(vcs.events, [
+      'clean',
+      'fetch',
+      'build',
+      'only-package',
+      'Preparamos version 1.1.0',
+      'tag:example-app-1.1.0',
+      'preflight-merge',
+      'connect-failed',
+    ]);
+    assert.equal(vcs.branch, 'main');
+  });
+});
+
+test('un fallo de conexion con no-version no crea ningun commit', async () => {
+  await fixture(async (cwd) => {
+    const vcs = new FakeVcs();
+    await assert.rejects(
+      runRelease({
+        config,
+        vcs,
+        mode: 'no-version',
+        cwd,
+        build: async () => { vcs.events.push('build'); },
+        findArtifacts: async () => [{ name: 'es', localDirectory: '/tmp/es' }],
+        transportFactory: () => ({}),
+        deployPublication: async () => {
+          vcs.events.push('connect-failed');
+          throw new Error('connect ETIMEDOUT');
+        },
+        log() {},
+      }),
+      /ETIMEDOUT/u,
+    );
+    assert.equal(vcs.events.some((event) => event.startsWith('Preparamos version')), false);
+    assert.equal(vcs.events.some((event) => event.startsWith('Publicamos version')), false);
+    assert.equal(vcs.events.some((event) => event.startsWith('tag:')), false);
+    assert.equal(vcs.events.some((event) => event.startsWith('checkout:')), false);
+  });
+});
+
+test('la prevalidacion del merge falla antes de conectar', async () => {
+  await fixture(async (cwd) => {
+    const vcs = new FakeVcs();
+    vcs.assertMergePreservesSource = async () => {
+      vcs.events.push('preflight-failed');
+      throw new Error('publication branch diverged');
+    };
+    await assert.rejects(
+      runRelease({
+        config,
+        vcs,
+        mode: 'no-version',
+        cwd,
+        build: async () => { vcs.events.push('build'); },
+        findArtifacts: async () => [{ name: 'es', localDirectory: '/tmp/es' }],
+        transportFactory: () => ({}),
+        deployPublication: async () => { vcs.events.push('deploy'); },
+        log() {},
+      }),
+      /diverged/u,
+    );
+    assert.equal(vcs.events.includes('deploy'), false);
+    assert.equal(vcs.events.some((event) => event.startsWith('checkout:')), false);
   });
 });

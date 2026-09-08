@@ -94,7 +94,7 @@ SFTP does not read FTP credentials. It delegates host, user, port, keys, agent, 
 
 ## 7. VCS and branches
 
-Publication requires a clean workspace. The publication branch must exist locally or on the configured remote. Git uses a no-fast-forward merge; Mercurial creates a merge changeset. The resulting tracked tree must exactly match the source revision.
+Publication requires a clean workspace. The publication branch must exist locally or on the configured remote. Before connecting, the tool compares that branch with its common ancestor and rejects any publication-side content change. The actual merge is deferred until remote deployment succeeds. Git uses a no-fast-forward merge; Mercurial creates a merge changeset. The resulting tracked tree is checked again and must exactly match the source revision.
 
 New-version tags use `${name}-${version}`, where `name` comes from the consumer's `package.json`.
 
