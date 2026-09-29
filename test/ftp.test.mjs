@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { publishArtifacts } from '../src/publication.mjs';
 import { FtpTransport } from '../src/transports/ftp.mjs';
 
 class FakeFtpClient {
@@ -11,7 +12,10 @@ class FakeFtpClient {
     if (this.failCd) throw { code: 550 };
   }
   async ensureDir(path) { this.operations.push(['ensureDir', path]); }
-  async list(path) { this.operations.push(['list', path]); }
+  async list(path) {
+    this.operations.push(['list', path]);
+    return this.listing ?? [{ name: path }];
+  }
   async uploadFromDir(localPath, remotePath) { this.operations.push(['uploadFromDir', localPath, remotePath]); }
   async removeDir(path) { this.operations.push(['removeDir', path]); }
   async rename(sourcePath, destinationPath) { this.operations.push(['rename', sourcePath, destinationPath]); }
@@ -70,4 +74,23 @@ test('FTP conserva la creacion del directorio cuando no existe', async () => {
     ['cd', '/public_html'],
     ['ensureDir', '/public_html'],
   ]);
+});
+
+test('FTP no elimina un directorio temporal cuando LIST responde vacio', async () => {
+  const client = new FakeFtpClient();
+  client.listing = [];
+  const transport = new FtpTransport(config, client);
+
+  await transport.connect();
+  await publishArtifacts({
+    transport,
+    artifacts: [{ name: 'en', localDirectory: '/local/en' }],
+    remoteDirectory: '/public_html',
+    log() {},
+  });
+
+  assert.equal(client.operations.some(([operation]) => operation === 'removeDir'), false);
+  assert(client.operations.some(([operation, local, remote]) => (
+    operation === 'uploadFromDir' && local === '/local/en' && remote === 'en_new'
+  )));
 });

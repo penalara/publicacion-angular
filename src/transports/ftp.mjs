@@ -32,8 +32,8 @@ export class FtpTransport {
 
   async exists(remotePath) {
     try {
-      await this.#client.list(this.#relativePath(remotePath));
-      return true;
+      const entries = await this.#client.list(this.#relativePath(remotePath));
+      return entries.length > 0;
     } catch (error) {
       if (error instanceof FTPError && error.code === 550) return false;
       throw error;
