@@ -78,6 +78,8 @@ Detected identifiers accept letters, digits, dots, hyphens, and underscores. `_n
 
 FTP credentials live outside the repository in `~/.npm/publicacion.credenciales.json`, grouped first by CLI project identifier and then by environment. The tool never creates or changes this file. FTP transmits credentials and content without encryption.
 
+`remoteDirectory` is opened directly after authentication. It must be the path visible to the FTP account, not the physical server path. For example, if FileZilla starts in `public_html` and cannot navigate to its parent, configure `/public_html`. Artifacts are managed from that directory without returning to `/`.
+
 ## 6. SFTP
 
 ```json

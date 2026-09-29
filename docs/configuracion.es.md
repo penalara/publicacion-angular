@@ -80,6 +80,8 @@ Los identificadores detectados solo admiten letras, números, punto, guion y gui
 
 FTP transmite las credenciales y el contenido sin cifrar. Úselo solo cuando el servidor no ofrezca un transporte seguro.
 
+`remoteDirectory` se abre directamente tras autenticar. Debe ser la ruta visible para la cuenta FTP, no la ruta física del servidor. Por ejemplo, si FileZilla inicia en `public_html` y no permite subir a su raíz, configure `/public_html`. Los artefactos se gestionan desde ese directorio sin volver a `/`.
+
 Las credenciales se guardan fuera del repositorio en `~/.npm/publicacion.credenciales.json`:
 
 ```json
