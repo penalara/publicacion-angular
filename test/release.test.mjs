@@ -89,6 +89,26 @@ test('build y despliegue preceden al merge y al push', async () => {
   });
 });
 
+test('usa el prefijo de tag configurado', async () => {
+  await fixture(async (cwd) => {
+    const vcs = new FakeVcs();
+    await runRelease({
+      config: { ...config, tagPrefix: 'application-release' },
+      vcs,
+      mode: 'new-version',
+      requestedVersion: '1.1.0',
+      cwd,
+      build: async () => {},
+      findArtifacts: async () => [{ name: 'es', localDirectory: '/tmp/es' }],
+      transportFactory: () => ({}),
+      deployPublication: async () => {},
+      log() {},
+    });
+
+    assert(vcs.events.includes('tag:application-release-1.1.0'));
+  });
+});
+
 test('un build fallido restaura package.json y no crea historial', async () => {
   await fixture(async (cwd) => {
     const vcs = new FakeVcs();

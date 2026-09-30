@@ -21,11 +21,16 @@ Las rutas locales son relativas a la raíz desde la que se ejecuta npm.
   "deploymentLog": {
     "remotePath": "/despliegues-automaticos.log"
   },
+  "release": {
+    "tagPrefix": "example-angular-app"
+  },
   "environments": {}
 }
 ```
 
 `vcs.type` admite `auto`, `git` y `mercurial`. El remoto predeterminado es `origin` en Git y `default` en Mercurial.
+
+`release.tagPrefix` es opcional y define el prefijo de los tags creados con `--new-version`. Por ejemplo, `example-angular-app` genera `example-angular-app-1.2.3`. Si se omite, se usa `name` de `package.json`.
 
 ## 3. Entornos
 
@@ -122,7 +127,7 @@ sftp web-production
 
 La publicación exige un workspace limpio. La rama de publicación debe existir localmente o en el remoto configurado. Antes de conectar, el publicador compara esa rama con su ancestro común y rechaza cualquier cambio de contenido propio. El merge real se aplaza hasta completar el despliegue remoto. Git usa un merge `--no-ff`; Mercurial crea un changeset de merge. El árbol resultante se vuelve a comparar y debe coincidir exactamente con la revisión origen.
 
-El tag de `--new-version` es `${name}-${version}`, donde `name` procede del `package.json`, no del identificador de proyecto usado para credenciales.
+El tag de `--new-version` es `${release.tagPrefix}-${version}` cuando se configura ese valor. Si se omite, es `${name}-${version}`, donde `name` procede del `package.json`, no del identificador de proyecto usado para credenciales.
 
 ## 8. Registro remoto
 

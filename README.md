@@ -31,6 +31,9 @@ La configuración se guarda en `tools/publicacion/publicacion.config.json`. Este
   "deploymentLog": {
     "remotePath": "/despliegues-automaticos.log"
   },
+  "release": {
+    "tagPrefix": "example-angular-app"
+  },
   "environments": {
     "pruebas": {
       "name": "Pruebas",

@@ -74,6 +74,30 @@ test('SFTP no lee el fichero de credenciales', async () => {
   });
 });
 
+test('carga el prefijo de tag configurado para releases', async () => {
+  await withFiles(async (paths) => {
+    const configured = structuredClone(baseConfig);
+    configured.release = { tagPrefix: 'example-release' };
+    await writeFile(paths.configPath, JSON.stringify(configured));
+
+    const config = await loadPublicationConfig('example-app', 'pruebas', paths);
+    assert.equal(config.tagPrefix, 'example-release');
+  });
+});
+
+test('rechaza un prefijo de tag no valido', async () => {
+  await withFiles(async (paths) => {
+    const configured = structuredClone(baseConfig);
+    configured.release = { tagPrefix: 'example release' };
+    await writeFile(paths.configPath, JSON.stringify(configured));
+
+    await assert.rejects(
+      loadPublicationConfig('example-app', 'pruebas', paths),
+      /release\.tagPrefix/u,
+    );
+  });
+});
+
 test('versionBranch requiere una publicationBranch diferente', async () => {
   await withFiles(async (paths) => {
     const invalid = structuredClone(baseConfig);

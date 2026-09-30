@@ -21,11 +21,16 @@ Local paths are relative to the directory where npm starts.
   "deploymentLog": {
     "remotePath": "/deployment.log"
   },
+  "release": {
+    "tagPrefix": "example-angular-app"
+  },
   "environments": {}
 }
 ```
 
 `vcs.type` accepts `auto`, `git`, or `mercurial`. The default remote is `origin` for Git and `default` for Mercurial.
+
+`release.tagPrefix` is optional and defines the prefix for tags created with `--new-version`. For example, `example-angular-app` produces `example-angular-app-1.2.3`. When omitted, `package.json.name` is used.
 
 ## 3. Environments
 
@@ -98,7 +103,7 @@ SFTP does not read FTP credentials. It delegates host, user, port, keys, agent, 
 
 Publication requires a clean workspace. The publication branch must exist locally or on the configured remote. Before connecting, the tool compares that branch with its common ancestor and rejects any publication-side content change. The actual merge is deferred until remote deployment succeeds. Git uses a no-fast-forward merge; Mercurial creates a merge changeset. The resulting tracked tree is checked again and must exactly match the source revision.
 
-New-version tags use `${name}-${version}`, where `name` comes from the consumer's `package.json`.
+New-version tags use `${release.tagPrefix}-${version}` when configured. Otherwise they use `${name}-${version}`, where `name` comes from the consumer's `package.json`.
 
 ## 8. Remote log
 

@@ -52,6 +52,15 @@ function validateRemotePath(value, label) {
   return posix.normalize(value).replace(/\/+$/u, '') || '/';
 }
 
+function optionalTagPrefix(config) {
+  if (config.tagPrefix === undefined) return undefined;
+  const tagPrefix = requireString(config, 'tagPrefix', 'la configuracion de release');
+  if (!/^[A-Za-z0-9@][A-Za-z0-9._@/-]*$/u.test(tagPrefix) || tagPrefix.includes('..') || tagPrefix.endsWith('/')) {
+    throw new ConfigurationError('release.tagPrefix no es un prefijo de tag valido.');
+  }
+  return tagPrefix;
+}
+
 function optionalBranch(config, property, label) {
   if (config[property] === undefined) return undefined;
   const branch = requireString(config, property, label);
@@ -161,6 +170,11 @@ export async function loadPublicationConfig(
     'deploymentLog.remotePath',
   );
 
+  const releaseConfig = root.release === undefined
+    ? {}
+    : requireObject(root.release, 'La propiedad "release"');
+  const tagPrefix = optionalTagPrefix(releaseConfig);
+
   const transport = requireObject(environmentConfig.transport, `El transporte de ${label}`);
   const transportType = requireString(transport, 'type', `el transporte de ${label}`).toUpperCase();
   const remoteDirectory = validateRemotePath(
@@ -201,6 +215,7 @@ export async function loadPublicationConfig(
     versionBranch,
     vcs: { type: vcsType, remote: vcsRemote },
     remoteLogPath,
+    tagPrefix,
     transport: normalizedTransport,
   };
 }

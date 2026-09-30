@@ -5,10 +5,10 @@ import { deploy } from './publication.mjs';
 import { createTransport } from './transports/index.mjs';
 import { preparePackageVersion, readPackageInfo, validateVersion } from './version.mjs';
 
-function releaseTag(name, version) {
-  const tag = `${name}-${version}`;
+function releaseTag(prefix, version) {
+  const tag = `${prefix}-${version}`;
   if (!/^[A-Za-z0-9@][A-Za-z0-9._@/-]*$/u.test(tag) || tag.includes('..') || tag.endsWith('/')) {
-    throw new Error(`El nombre de package.json produce un tag no valido: ${tag}`);
+    throw new Error(`El prefijo de tag produce un tag no valido: ${tag}`);
   }
   return tag;
 }
@@ -117,7 +117,7 @@ export async function runRelease({
     version = requestedVersion
       ? validateVersion(requestedVersion)
       : await askForVersion(packageInfo.version);
-    tag = releaseTag(packageInfo.name, version);
+    tag = releaseTag(config.tagPrefix || packageInfo.name, version);
     if (resume) {
       const localTagExists = await vcs.tagExists(tag);
       if (
