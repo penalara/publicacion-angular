@@ -85,7 +85,7 @@ export async function deploy({ config, version, revision, artifacts, transport, 
       await publishArtifacts({
         transport,
         artifacts,
-        remoteDirectory: config.transport.remoteDirectory,
+        remoteDirectory: config.sftpConfig.remoteDirectory,
         log,
       });
       await deploymentLog.publish();

@@ -2,7 +2,7 @@
 
 ## 1. Ubicación
 
-Cada proyecto debe contener únicamente esta configuración específica:
+Cada proyecto contiene su configuración en:
 
 ```text
 tools/publicacion/publicacion.config.json
@@ -15,8 +15,8 @@ Las rutas locales son relativas a la raíz desde la que se ejecuta npm.
 ```json
 {
   "vcs": {
-    "type": "mercurial",
-    "remote": "default"
+    "type": "git",
+    "remote": "origin"
   },
   "deploymentLog": {
     "remotePath": "/despliegues-automaticos.log"
@@ -30,7 +30,7 @@ Las rutas locales son relativas a la raíz desde la que se ejecuta npm.
 
 `vcs.type` admite `auto`, `git` y `mercurial`. El remoto predeterminado es `origin` en Git y `default` en Mercurial.
 
-`release.tagPrefix` es opcional y define el prefijo de los tags creados con `--new-version`. Por ejemplo, `example-angular-app` genera `example-angular-app-1.2.3`. Si se omite, se usa `name` de `package.json`.
+`release.tagPrefix` es opcional y define el prefijo de los tags creados con `--new-version`. Si se omite, se usa `name` de `package.json`.
 
 ## 3. Entornos
 
@@ -44,9 +44,11 @@ Cada clave de `environments` puede tener cualquier nombre seguro. Sus propiedade
 | `requiredFile` | Sí | Fichero que debe existir dentro de cada artefacto. |
 | `publicationBranch` | No | Rama existente que recibe el merge de publicación. |
 | `versionBranch` | No | Rama origen cuyo modo predeterminado es `--no-version`. |
-| `transport` | Sí | Configuración FTP o SFTP. |
+| `sftpConfig` | Sí | Configuración de conexión SFTP. |
 
 Si se declara `versionBranch`, también debe declararse `publicationBranch`, y no pueden ser iguales.
+
+La propiedad anterior `transport` ya no se admite. Solo se permite SFTP mediante `sftpConfig`.
 
 ## 4. Patrones de artefactos
 
@@ -70,74 +72,50 @@ También puede formar parte de un nombre de directorio:
 
 Los identificadores detectados solo admiten letras, números, punto, guion y guion bajo. `_new` y `_old` están reservados.
 
-## 5. FTP
+## 5. SFTP
 
 ```json
 {
-  "transport": {
-    "type": "ftp",
-    "host": "ftp.testing.example.com",
-    "port": 21,
-    "remoteDirectory": "/www/application"
-  }
-}
-```
-
-FTP transmite las credenciales y el contenido sin cifrar. Úselo solo cuando el servidor no ofrezca un transporte seguro.
-
-`remoteDirectory` se abre directamente tras autenticar. Debe ser la ruta visible para la cuenta FTP, no la ruta física del servidor. Por ejemplo, si FileZilla inicia en `public_html` y no permite subir a su raíz, configure `/public_html`. Los artefactos se gestionan desde ese directorio sin volver a `/`.
-
-Las credenciales se guardan fuera del repositorio en `~/.npm/publicacion.credenciales.json`:
-
-```json
-{
-  "example-angular-app": {
-    "pruebas": {
-      "username": "example-user",
-      "password": "example-password"
-    }
-  }
-}
-```
-
-El primer nivel coincide con el argumento `<proyecto>` del CLI y el segundo con `<entorno>`. El publicador no crea ni modifica este fichero.
-
-## 6. SFTP
-
-```json
-{
-  "transport": {
-    "type": "sftp",
+  "sftpConfig": {
     "sshAlias": "web-production",
     "remoteDirectory": "/www/application"
   }
 }
 ```
 
-SFTP no lee el fichero de credenciales. Usa el alias de la configuración OpenSSH del usuario. La cuenta debe permitir el subsistema SFTP y los comandos remotos POSIX `test`, `rm` y `mv`.
+SFTP usa un alias de la configuración OpenSSH del usuario. No se leen ni almacenan credenciales en el repositorio ni en ficheros de npm.
 
-Compruebe el acceso antes de publicar:
+El alias se configura normalmente en `~/.ssh/config`:
+
+```sshconfig
+Host web-production
+  HostName servidor.example.com
+  User usuario-despliegue
+  Port 22
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+La cuenta debe permitir el subsistema SFTP y los comandos remotos POSIX `test`, `rm` y `mv`. Compruebe el acceso antes de publicar:
 
 ```bash
 ssh web-production
 sftp web-production
 ```
 
-## 7. Ramas y VCS
+## 6. Ramas y VCS
 
 La publicación exige un workspace limpio. La rama de publicación debe existir localmente o en el remoto configurado. Antes de conectar, el publicador compara esa rama con su ancestro común y rechaza cualquier cambio de contenido propio. El merge real se aplaza hasta completar el despliegue remoto. Git usa un merge `--no-ff`; Mercurial crea un changeset de merge. El árbol resultante se vuelve a comparar y debe coincidir exactamente con la revisión origen.
 
-El tag de `--new-version` es `${release.tagPrefix}-${version}` cuando se configura ese valor. Si se omite, es `${name}-${version}`, donde `name` procede del `package.json`, no del identificador de proyecto usado para credenciales.
+El tag de `--new-version` es `${release.tagPrefix}-${version}` cuando se configura ese valor. Si se omite, es `${name}-${version}`, donde `name` procede del `package.json`.
 
-## 8. Registro remoto
+## 7. Registro remoto
 
 `deploymentLog.remotePath` debe ser una ruta absoluta. El fichero contiene versión, revisión, usuario del sistema y fecha local. Su actualización usa los sufijos `_new` y `_old` y dispone de rollback propio.
 
-La cuenta remota necesita permisos de lectura, escritura, eliminación y renombrado tanto en `remoteDirectory` como en la ruta del log.
+La cuenta remota necesita permisos de lectura, escritura, eliminación y renombrado tanto en `sftpConfig.remoteDirectory` como en la ruta del log.
 
-## 9. Seguridad
+## 8. Seguridad
 
-- No incluya contraseñas, claves privadas ni tokens en la configuración versionada.
 - No desactive la comprobación de claves de host SSH.
-- No comparta `publicacion.credenciales.json`.
+- No comparta claves privadas ni frases de contraseña.
 - Revise manualmente cualquier fallo de rollback antes de repetir una publicación.

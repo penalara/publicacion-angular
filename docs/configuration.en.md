@@ -2,13 +2,13 @@
 
 ## 1. Location
 
-Each consumer stores its project-specific settings at:
+Each project stores its configuration in:
 
 ```text
 tools/publicacion/publicacion.config.json
 ```
 
-Local paths are relative to the directory where npm starts.
+Local paths are relative to the directory from which npm runs.
 
 ## 2. Root structure
 
@@ -30,9 +30,11 @@ Local paths are relative to the directory where npm starts.
 
 `vcs.type` accepts `auto`, `git`, or `mercurial`. The default remote is `origin` for Git and `default` for Mercurial.
 
-`release.tagPrefix` is optional and defines the prefix for tags created with `--new-version`. For example, `example-angular-app` produces `example-angular-app-1.2.3`. When omitted, `package.json.name` is used.
+`release.tagPrefix` is optional and defines the prefix for tags created with `--new-version`. When omitted, `package.json.name` is used.
 
 ## 3. Environments
+
+Each `environments` key can use any safe name. Its properties are:
 
 | Property | Required | Description |
 |---|---:|---|
@@ -42,9 +44,11 @@ Local paths are relative to the directory where npm starts.
 | `requiredFile` | Yes | File that must exist inside every artifact. |
 | `publicationBranch` | No | Existing branch that receives the publication merge. |
 | `versionBranch` | No | Source branch where `--no-version` is the default. |
-| `transport` | Yes | FTP or SFTP settings. |
+| `sftpConfig` | Yes | SFTP connection configuration. |
 
 `versionBranch` requires `publicationBranch`, and they must differ.
+
+The former `transport` property is no longer supported. Only SFTP through `sftpConfig` is allowed.
 
 ## 4. Artifact patterns
 
@@ -68,52 +72,50 @@ It may also occur inside a directory name:
 
 Detected identifiers accept letters, digits, dots, hyphens, and underscores. `_new` and `_old` are reserved.
 
-## 5. FTP
+## 5. SFTP
 
 ```json
 {
-  "transport": {
-    "type": "ftp",
-    "host": "ftp.testing.example.com",
-    "port": 21,
-    "remoteDirectory": "/www/application"
-  }
-}
-```
-
-FTP credentials live outside the repository in `~/.npm/publicacion.credenciales.json`, grouped first by CLI project identifier and then by environment. The tool never creates or changes this file. FTP transmits credentials and content without encryption.
-
-`remoteDirectory` is opened directly after authentication. It must be the path visible to the FTP account, not the physical server path. For example, if FileZilla starts in `public_html` and cannot navigate to its parent, configure `/public_html`. Artifacts are managed from that directory without returning to `/`.
-
-## 6. SFTP
-
-```json
-{
-  "transport": {
-    "type": "sftp",
+  "sftpConfig": {
     "sshAlias": "web-production",
     "remoteDirectory": "/www/application"
   }
 }
 ```
 
-SFTP does not read FTP credentials. It delegates host, user, port, keys, agent, proxy, and host-key checks to the user's OpenSSH configuration. The account must support SFTP and the remote POSIX commands `test`, `rm`, and `mv`.
+SFTP uses an alias from the user's OpenSSH configuration. No credentials are read from or stored in the repository or npm files.
 
-## 7. VCS and branches
+The alias is normally configured in `~/.ssh/config`:
+
+```sshconfig
+Host web-production
+  HostName server.example.com
+  User deployment-user
+  Port 22
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+The account must support the SFTP subsystem and the remote POSIX commands `test`, `rm`, and `mv`. Verify access before publishing:
+
+```bash
+ssh web-production
+sftp web-production
+```
+
+## 6. VCS and branches
 
 Publication requires a clean workspace. The publication branch must exist locally or on the configured remote. Before connecting, the tool compares that branch with its common ancestor and rejects any publication-side content change. The actual merge is deferred until remote deployment succeeds. Git uses a no-fast-forward merge; Mercurial creates a merge changeset. The resulting tracked tree is checked again and must exactly match the source revision.
 
 New-version tags use `${release.tagPrefix}-${version}` when configured. Otherwise they use `${name}-${version}`, where `name` comes from the consumer's `package.json`.
 
-## 8. Remote log
+## 7. Remote log
 
 `deploymentLog.remotePath` must be absolute. Each line records version, revision, operating-system user, and local date. The log itself is activated through `_new` and `_old` files with rollback.
 
-The remote account needs read, write, remove, and rename permissions for both the publication directory and log path.
+The remote account needs read, write, remove, and rename permissions for both `sftpConfig.remoteDirectory` and the log path.
 
-## 9. Security
+## 8. Security
 
-- Never commit passwords, private keys, passphrases, or tokens.
 - Keep normal SSH host-key verification enabled.
-- Never share `publicacion.credenciales.json`.
+- Never share private keys or passphrases.
 - Inspect the remote state before retrying after a rollback error.

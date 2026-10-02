@@ -2,12 +2,12 @@
 
 ## Castellano
 
-`@penalara/publicacion-angular` es una herramienta de línea de comandos para compilar y publicar aplicaciones Angular estáticas mediante FTP o SFTP. Los scripts de build, las rutas de artefactos, las ramas y el transporte se definen en cada proyecto, por lo que funciona tanto con Angular CLI como con Nx sin incorporar lógica de una aplicación concreta.
+`@penalara/publicacion-angular` es una herramienta de línea de comandos para compilar y publicar aplicaciones Angular estáticas mediante SFTP. Los scripts de build, las rutas de artefactos y las ramas se definen en cada proyecto, por lo que funciona tanto con Angular CLI como con Nx sin incorporar lógica de una aplicación concreta.
 
 ### Instalación
 
 ```bash
-npm install --save-dev --save-exact @penalara/publicacion-angular@1.0.1
+npm install --save-dev --save-exact @penalara/publicacion-angular@<version>
 ```
 
 El paquete expone el binario `penalara-publicacion`:
@@ -15,13 +15,13 @@ El paquete expone el binario `penalara-publicacion`:
 ```json
 {
   "scripts": {
-    "publicar:pruebas": "penalara-publicacion example-angular-app pruebas",
-    "publicar:prod": "penalara-publicacion example-angular-app produccion"
+    "publicar:pruebas": "penalara-publicacion pruebas",
+    "publicar:prod": "penalara-publicacion produccion --no-version"
   }
 }
 ```
 
-La configuración se guarda en `tools/publicacion/publicacion.config.json`. Este ejemplo usa FTP en pruebas y SFTP en producción:
+La configuración se guarda en `tools/publicacion/publicacion.config.json` y usa SFTP en todos los entornos:
 
 ```json
 {
@@ -42,10 +42,8 @@ La configuración se guarda en `tools/publicacion/publicacion.config.json`. Este
       "requiredFile": "index.html",
       "versionBranch": "versiones-pruebas",
       "publicationBranch": "publicacion-pruebas",
-      "transport": {
-        "type": "ftp",
-        "host": "ftp.testing.example.com",
-        "port": 21,
+      "sftpConfig": {
+        "sshAlias": "web-testing",
         "remoteDirectory": "/www/application"
       }
     },
@@ -56,8 +54,7 @@ La configuración se guarda en `tools/publicacion/publicacion.config.json`. Este
       "requiredFile": "index.html",
       "versionBranch": "versiones-produccion",
       "publicationBranch": "publicacion-produccion",
-      "transport": {
-        "type": "sftp",
+      "sftpConfig": {
         "sshAlias": "web-production",
         "remoteDirectory": "/www/application"
       }
@@ -87,15 +84,15 @@ Este proyecto se distribuye bajo la [licencia MIT](LICENSE).
 
 ## English
 
-`@penalara/publicacion-angular` is a command-line tool that builds and publishes static Angular applications over FTP or SFTP. Build scripts, artifact paths, branches, and transports are configured by each consumer, so it supports both Angular CLI and Nx without application-specific logic.
+`@penalara/publicacion-angular` is a command-line tool that builds and publishes static Angular applications over SFTP. Build scripts, artifact paths, and branches are configured by each consumer, so it supports both Angular CLI and Nx without application-specific logic.
 
 ### Installation
 
 ```bash
-npm install --save-dev --save-exact @penalara/publicacion-angular@1.0.1
+npm install --save-dev --save-exact @penalara/publicacion-angular@<version>
 ```
 
-The package exposes the `penalara-publicacion` binary. Store its configuration in `tools/publicacion/publicacion.config.json`; the generic example above uses FTP for testing and SFTP for production.
+The package exposes the `penalara-publicacion` binary. Store its SFTP configuration in `tools/publicacion/publicacion.config.json`.
 
 Typical usage:
 

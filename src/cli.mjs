@@ -24,15 +24,14 @@ export function parseArguments(args) {
       positional.push(argument);
     }
   }
-  if (positional.length < 2 || positional.length > 3) {
+  if (positional.length < 1 || positional.length > 2) {
     throw new Error(
-      'Uso: penalara-publicacion <proyecto> <entorno> [version] [--new-version|--no-version] [--resume]',
+      'Uso: penalara-publicacion <entorno> [version] [--new-version|--no-version] [--resume]',
     );
   }
   return {
-    project: positional[0],
-    environment: positional[1],
-    requestedVersion: positional[2],
+    environment: positional[0],
+    requestedVersion: positional[1],
     explicitMode,
     resume,
     allowNonstandardSource,
@@ -41,7 +40,7 @@ export function parseArguments(args) {
 
 export async function runCli(args, { cwd = process.cwd(), log = console.log } = {}) {
   const options = parseArguments(args);
-  const config = await loadPublicationConfig(options.project, options.environment, { cwd });
+  const config = await loadPublicationConfig(options.environment, { cwd });
   const vcs = await createVcs(config, cwd);
   const currentBranch = await vcs.currentBranch();
   const mode = inferVersionMode({

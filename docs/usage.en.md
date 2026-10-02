@@ -2,20 +2,20 @@
 
 ## 1. Purpose
 
-`@penalara/publicacion-angular` builds an application, discovers its static artifacts, and activates them on a remote server through `<language>_new`, `<language>`, and `<language>_old` directories. The same workflow supports Git or Mercurial and FTP or SFTP.
+`@penalara/publicacion-angular` builds an application, discovers its static artifacts, and activates them over SFTP on a remote server through `<language>_new`, `<language>`, and `<language>_old` directories. The same workflow supports Git or Mercurial.
 
 ## 2. Requirements
 
 - Node.js 20.9 or later and npm.
 - A Git or Mercurial repository with identity and remote configured.
 - A clean workspace, including untracked files.
-- FTP access or the OpenSSH `ssh` and `sftp` tools.
+- OpenSSH `ssh` and `sftp` tools and a configured remote-server alias.
 - An npm script that builds and tests every required artifact.
 
 ## 3. Invocation
 
 ```text
-penalara-publicacion <project> <environment> [version] [options]
+penalara-publicacion <environment> [version] [options]
 ```
 
 ```bash
@@ -25,7 +25,7 @@ npm run publish:testing -- --no-version
 npm run publish:testing -- --resume --new-version 2.1.0
 ```
 
-The project identifier selects FTP credentials. The environment selects an entry from `publicacion.config.json`.
+The environment selects an entry from `publicacion.config.json`.
 
 ## 4. Version modes
 

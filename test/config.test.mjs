@@ -16,10 +16,8 @@ const baseConfig = {
       requiredFile: 'index.html',
       versionBranch: 'versions-testing',
       publicationBranch: 'publication-testing',
-      transport: {
-        type: 'ftp',
-        host: 'ftp.testing.example.com',
-        port: 21,
+      sftpConfig: {
+        sshAlias: 'web-testing',
         remoteDirectory: '/www/application',
       },
     },
@@ -28,8 +26,7 @@ const baseConfig = {
       buildScript: 'build:production',
       artifactPathPattern: 'dist/production/app-{language}/{language}',
       requiredFile: 'index.html',
-      transport: {
-        type: 'sftp',
+      sftpConfig: {
         sshAlias: 'web-production',
         remoteDirectory: '/www/application',
       },
@@ -40,37 +37,28 @@ const baseConfig = {
 async function withFiles(callback) {
   const directory = await mkdtemp(join(tmpdir(), 'publication-config-'));
   const configPath = join(directory, 'config.json');
-  const credentialsPath = join(directory, 'credentials.json');
   await writeFile(configPath, JSON.stringify(baseConfig));
-  await writeFile(credentialsPath, JSON.stringify({
-    'example-app': {
-      pruebas: { username: 'test-user', password: 'test-password' },
-    },
-  }));
   try {
-    await callback({ configPath, credentialsPath });
+    await callback({ configPath });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 }
 
-test('carga FTP y credenciales por proyecto y entorno', async () => {
-  await withFiles(async (paths) => {
-    const config = await loadPublicationConfig('example-app', 'pruebas', paths);
-    assert.equal(config.transport.type, 'FTP');
-    assert.equal(config.transport.username, 'test-user');
+test('carga la configuracion SFTP del entorno', async () => {
+  await withFiles(async ({ configPath }) => {
+    const config = await loadPublicationConfig('pruebas', { configPath });
+    assert.equal(config.sftpConfig.sshAlias, 'web-testing');
     assert.equal(config.versionBranch, 'versions-testing');
   });
 });
 
-test('SFTP no lee el fichero de credenciales', async () => {
+test('rechaza la configuracion transport anterior', async () => {
   await withFiles(async ({ configPath }) => {
-    const config = await loadPublicationConfig('example-app', 'produccion', {
-      configPath,
-      credentialsPath: join(tmpdir(), 'does-not-exist.json'),
-    });
-    assert.equal(config.transport.type, 'SFTP');
-    assert.equal(config.transport.sshAlias, 'web-production');
+    const invalid = structuredClone(baseConfig);
+    invalid.environments.pruebas.transport = { type: 'ftp' };
+    await writeFile(configPath, JSON.stringify(invalid));
+    await assert.rejects(loadPublicationConfig('pruebas', { configPath }), /transport.*sftpConfig/u);
   });
 });
 
@@ -80,7 +68,7 @@ test('carga el prefijo de tag configurado para releases', async () => {
     configured.release = { tagPrefix: 'example-release' };
     await writeFile(paths.configPath, JSON.stringify(configured));
 
-    const config = await loadPublicationConfig('example-app', 'pruebas', paths);
+    const config = await loadPublicationConfig('pruebas', paths);
     assert.equal(config.tagPrefix, 'example-release');
   });
 });
@@ -92,7 +80,7 @@ test('rechaza un prefijo de tag no valido', async () => {
     await writeFile(paths.configPath, JSON.stringify(configured));
 
     await assert.rejects(
-      loadPublicationConfig('example-app', 'pruebas', paths),
+      loadPublicationConfig('pruebas', paths),
       /release\.tagPrefix/u,
     );
   });
@@ -103,7 +91,7 @@ test('versionBranch requiere una publicationBranch diferente', async () => {
     const invalid = structuredClone(baseConfig);
     delete invalid.environments.pruebas.publicationBranch;
     await writeFile(paths.configPath, JSON.stringify(invalid));
-    await assert.rejects(loadPublicationConfig('example-app', 'pruebas', paths), /requiere publicationBranch/u);
+    await assert.rejects(loadPublicationConfig('pruebas', paths), /requiere publicationBranch/u);
   });
 });
 
@@ -112,6 +100,6 @@ test('el patron de artefactos debe contener language', async () => {
     const invalid = structuredClone(baseConfig);
     invalid.environments.pruebas.artifactPathPattern = 'dist/testing/es';
     await writeFile(paths.configPath, JSON.stringify(invalid));
-    await assert.rejects(loadPublicationConfig('example-app', 'pruebas', paths), /\{language\}/u);
+    await assert.rejects(loadPublicationConfig('pruebas', paths), /\{language\}/u);
   });
 });

@@ -3,11 +3,10 @@ import test from 'node:test';
 import { parseArguments } from '../src/cli.mjs';
 import { inferVersionMode } from '../src/release.mjs';
 
-test('analiza proyecto, entorno, version y flags en cualquier orden', () => {
+test('analiza entorno, version y flags en cualquier orden', () => {
   assert.deepEqual(
-    parseArguments(['example-app', 'pruebas', '--resume', '1.2.3', '--new-version']),
+    parseArguments(['pruebas', '--resume', '1.2.3', '--new-version']),
     {
-      project: 'example-app',
       environment: 'pruebas',
       requestedVersion: '1.2.3',
       explicitMode: 'new-version',
@@ -19,7 +18,7 @@ test('analiza proyecto, entorno, version y flags en cualquier orden', () => {
 
 test('rechaza modos de version incompatibles', () => {
   assert.throws(
-    () => parseArguments(['example-app', 'pruebas', '--new-version', '--no-version']),
+    () => parseArguments(['pruebas', '--new-version', '--no-version']),
     /mutuamente excluyentes/u,
   );
 });

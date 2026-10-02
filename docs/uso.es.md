@@ -2,20 +2,20 @@
 
 ## 1. Objetivo
 
-`@penalara/publicacion-angular` compila una aplicación, descubre sus artefactos estáticos y los activa en un servidor remoto mediante directorios `<idioma>_new`, `<idioma>` y `<idioma>_old`. El mismo flujo funciona con Git y Mercurial, y con FTP o SFTP.
+`@penalara/publicacion-angular` compila una aplicación, descubre sus artefactos estáticos y los activa mediante SFTP en un servidor remoto mediante directorios `<idioma>_new`, `<idioma>` y `<idioma>_old`. El mismo flujo funciona con Git y Mercurial.
 
 ## 2. Requisitos
 
 - Node.js 20.9 o posterior y npm.
 - Un repositorio Git o Mercurial con identidad y remoto configurados.
 - Workspace limpio, incluidos los archivos no versionados.
-- Acceso FTP o herramientas OpenSSH `ssh` y `sftp`, según el transporte.
+- Herramientas OpenSSH `ssh` y `sftp` y un alias configurado para el servidor remoto.
 - Un script npm que compile y pruebe todos los artefactos necesarios.
 
 ## 3. Invocación
 
 ```text
-penalara-publicacion <proyecto> <entorno> [versión] [opciones]
+penalara-publicacion <entorno> [versión] [opciones]
 ```
 
 Ejemplos:
@@ -27,7 +27,7 @@ npm run publicar:pruebas -- --no-version
 npm run publicar:pruebas -- --resume --new-version 2.1.0
 ```
 
-El identificador de proyecto selecciona las credenciales FTP. El entorno selecciona una entrada de `publicacion.config.json`.
+El entorno selecciona una entrada de `publicacion.config.json`.
 
 ## 4. Modos de versión
 

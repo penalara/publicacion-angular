@@ -1,10 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { isAbsolute, posix, resolve } from 'node:path';
 import { ConfigurationError } from './errors.mjs';
 
 export const CONFIG_RELATIVE_PATH = 'tools/publicacion/publicacion.config.json';
-export const CREDENTIALS_PATH = resolve(homedir(), '.npm', 'publicacion.credenciales.json');
 
 async function readJson(filePath, description) {
   let contents;
@@ -81,40 +79,13 @@ function validateArtifactPattern(pattern, label) {
   return normalized;
 }
 
-async function loadFtpCredentials(project, environment, credentialsPath) {
-  const allCredentials = requireObject(
-    await readJson(credentialsPath, 'el fichero de credenciales FTP'),
-    'El fichero de credenciales FTP',
-  );
-  const projectCredentials = requireObject(
-    allCredentials[project],
-    `Las credenciales FTP del proyecto "${project}"`,
-  );
-  const credentials = requireObject(
-    projectCredentials[environment],
-    `Las credenciales FTP del entorno "${environment}" del proyecto "${project}"`,
-  );
-  const label = `las credenciales de "${project}/${environment}"`;
-  const username = requireString(credentials, 'username', label);
-  const password = requireString(credentials, 'password', label, { preserveWhitespace: true });
-  if (username.startsWith('USUARIO_FTP_') || password.startsWith('PASSWORD_FTP_')) {
-    throw new ConfigurationError(`${label} todavia contiene valores de ejemplo.`);
-  }
-  return { username, password };
-}
-
 export async function loadPublicationConfig(
-  project,
   environment,
   {
     cwd = process.cwd(),
     configPath = resolve(cwd, CONFIG_RELATIVE_PATH),
-    credentialsPath = CREDENTIALS_PATH,
   } = {},
 ) {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(project)) {
-    throw new ConfigurationError(`Identificador de proyecto no valido: "${project}".`);
-  }
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(environment)) {
     throw new ConfigurationError(`Entorno de publicacion no valido: "${environment}".`);
   }
@@ -175,37 +146,20 @@ export async function loadPublicationConfig(
     : requireObject(root.release, 'La propiedad "release"');
   const tagPrefix = optionalTagPrefix(releaseConfig);
 
-  const transport = requireObject(environmentConfig.transport, `El transporte de ${label}`);
-  const transportType = requireString(transport, 'type', `el transporte de ${label}`).toUpperCase();
+  if (environmentConfig.transport !== undefined) {
+    throw new ConfigurationError(`La propiedad "transport" de ${label} ya no se admite. Use "sftpConfig".`);
+  }
+  const sftpConfig = requireObject(environmentConfig.sftpConfig, `La configuracion SFTP de ${label}`);
   const remoteDirectory = validateRemotePath(
-    requireString(transport, 'remoteDirectory', `el transporte de ${label}`),
-    'transport.remoteDirectory',
+    requireString(sftpConfig, 'remoteDirectory', `la configuracion SFTP de ${label}`),
+    'sftpConfig.remoteDirectory',
   );
-  let normalizedTransport;
-  if (transportType === 'FTP') {
-    const host = requireString(transport, 'host', `el transporte de ${label}`);
-    if (!Number.isInteger(transport.port) || transport.port < 1 || transport.port > 65535) {
-      throw new ConfigurationError(`transport.port de ${label} debe ser un entero entre 1 y 65535.`);
-    }
-    normalizedTransport = {
-      type: transportType,
-      host,
-      port: transport.port,
-      remoteDirectory,
-      ...await loadFtpCredentials(project, environment, credentialsPath),
-    };
-  } else if (transportType === 'SFTP') {
-    const sshAlias = requireString(transport, 'sshAlias', `el transporte de ${label}`);
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(sshAlias)) {
-      throw new ConfigurationError(`transport.sshAlias de ${label} contiene caracteres no admitidos.`);
-    }
-    normalizedTransport = { type: transportType, sshAlias, remoteDirectory };
-  } else {
-    throw new ConfigurationError(`Transporte desconocido "${transport.type}" en ${label}.`);
+  const sshAlias = requireString(sftpConfig, 'sshAlias', `la configuracion SFTP de ${label}`);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(sshAlias)) {
+    throw new ConfigurationError(`sftpConfig.sshAlias de ${label} contiene caracteres no admitidos.`);
   }
 
   return {
-    project,
     environment,
     name,
     buildScript,
@@ -216,6 +170,6 @@ export async function loadPublicationConfig(
     vcs: { type: vcsType, remote: vcsRemote },
     remoteLogPath,
     tagPrefix,
-    transport: normalizedTransport,
+    sftpConfig: { sshAlias, remoteDirectory },
   };
 }

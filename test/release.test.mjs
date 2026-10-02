@@ -42,7 +42,7 @@ const config = {
   publicationBranch: 'publication-testing',
   versionBranch: 'versions-testing',
   vcs: { type: 'git', remote: 'origin' },
-  transport: { type: 'SFTP', remoteDirectory: '/www' },
+  sftpConfig: { sshAlias: 'web-testing', remoteDirectory: '/www' },
   remoteLogPath: '/deployment.log',
 };
 
