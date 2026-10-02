@@ -8,16 +8,23 @@ function sftpQuote(value) {
     .replace(/[\*?\[\]]/gu, '\\$&')}"`;
 }
 
-function parseListing(stdout) {
+function parseListing(stdout, directory) {
+  const prefix = `${directory}/`;
   return stdout
     .split(/\r?\n/u)
-    .filter((entry) => entry !== '' && entry !== '.' && entry !== '..')
-    .map((entry) => {
-      if (/^[\r\n\0]/u.test(entry) || posix.basename(entry) !== entry) {
-        throw new Error(`El servidor SFTP ha devuelto un nombre de fichero no valido: ${JSON.stringify(entry)}`);
+    .map((rawEntry) => {
+      const entry = rawEntry.startsWith(prefix) ? rawEntry.slice(prefix.length) : rawEntry;
+      if (
+        entry !== ''
+        && entry !== '.'
+        && entry !== '..'
+        && (/^[\r\n\0]/u.test(entry) || posix.basename(entry) !== entry)
+      ) {
+        throw new Error(`El servidor SFTP ha devuelto un nombre de fichero no valido: ${JSON.stringify(rawEntry)}`);
       }
       return entry;
-    });
+    })
+    .filter((entry) => entry !== '' && entry !== '.' && entry !== '..');
 }
 
 export class SftpTransport {
@@ -114,7 +121,7 @@ export class SftpTransport {
 
   async #listDirectory(remotePath) {
     const result = await this.#sftp(`@ls -1a ${sftpQuote(remotePath)}`);
-    return parseListing(result.stdout);
+    return parseListing(result.stdout, remotePath);
   }
 
   async #sftp(command, allowedExitCodes = [0]) {

@@ -69,3 +69,32 @@ test('SFTP elimina directorios de forma recursiva', async () => {
     ['sftp', 'rmdir "/www/application/es_new"\n'],
   ]);
 });
+
+test('SFTP acepta listados con rutas completas', async () => {
+  const remoteDirectory = '/ghcmppruebas/public_html/en_old';
+  const calls = [];
+  const run = async (command, args, options = {}) => {
+    calls.push({ command, args, options });
+    if (options.input === `@ls -1a "${remoteDirectory}"\n`) {
+      return {
+        exitCode: 0,
+        stdout: `${remoteDirectory}/.\n${remoteDirectory}/..\n${remoteDirectory}/index.html\n`,
+        stderr: '',
+      };
+    }
+    return { exitCode: 0, stdout: '', stderr: '' };
+  };
+  const transport = new SftpTransport({
+    sshAlias: 'web-production',
+    remoteDirectory: '/ghcmppruebas/public_html',
+    remoteLogPath: '/logs/deployment.log',
+  }, run);
+
+  await transport.removeDirectory(remoteDirectory);
+
+  assert.deepEqual(calls.map(({ options }) => options.input), [
+    `@ls -1a "${remoteDirectory}"\n`,
+    `rm "${remoteDirectory}/index.html"\n`,
+    `rmdir "${remoteDirectory}"\n`,
+  ]);
+});
