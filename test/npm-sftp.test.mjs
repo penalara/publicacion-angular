@@ -13,7 +13,7 @@ test('resuelve npm mediante su CLI JavaScript en Windows', () => {
   });
 });
 
-test('SFTP usa OpenSSH y rutas configurables de log', async () => {
+test('SFTP usa solo comandos SFTP y rutas configurables de log', async () => {
   const calls = [];
   const run = async (command, args, options = {}) => {
     calls.push({ command, args, options });
@@ -28,8 +28,44 @@ test('SFTP usa OpenSSH y rutas configurables de log', async () => {
   await transport.connect();
   await transport.uploadDirectory('C:\\build path\\es', '/www/application/es_new');
   await transport.fileExists('/logs/deployment.log');
-  assert(calls.some(({ command }) => command === 'ssh'));
+  assert.equal(calls.some(({ command }) => command === 'ssh'), false);
   assert(calls.some(({ command, options }) =>
     command === 'sftp' && options.input?.includes('C:/build path/es'),
   ));
+  assert(calls.some(({ options }) => options.input === '@ls "/www/application"\n'));
+});
+
+test('SFTP elimina directorios de forma recursiva', async () => {
+  const calls = [];
+  const run = async (command, args, options = {}) => {
+    calls.push({ command, args, options });
+    const input = options.input;
+    if (input === '@ls -1a "/www/application/es_new"\n') {
+      return { exitCode: 0, stdout: '.\n..\nmain.js\nassets\n', stderr: '' };
+    }
+    if (input === '@ls -1a "/www/application/es_new/assets"\n') {
+      return { exitCode: 0, stdout: 'logo.svg\n', stderr: '' };
+    }
+    if (input === 'rm "/www/application/es_new/assets"\n') {
+      return { exitCode: 1, stdout: '', stderr: 'not a file' };
+    }
+    return { exitCode: 0, stdout: '', stderr: '' };
+  };
+  const transport = new SftpTransport({
+    sshAlias: 'web-production',
+    remoteDirectory: '/www/application',
+    remoteLogPath: '/logs/deployment.log',
+  }, run);
+
+  await transport.removeDirectory('/www/application/es_new');
+
+  assert.deepEqual(calls.map(({ command, options }) => [command, options.input]), [
+    ['sftp', '@ls -1a "/www/application/es_new"\n'],
+    ['sftp', 'rm "/www/application/es_new/main.js"\n'],
+    ['sftp', 'rm "/www/application/es_new/assets"\n'],
+    ['sftp', '@ls -1a "/www/application/es_new/assets"\n'],
+    ['sftp', 'rm "/www/application/es_new/assets/logo.svg"\n'],
+    ['sftp', 'rmdir "/www/application/es_new/assets"\n'],
+    ['sftp', 'rmdir "/www/application/es_new"\n'],
+  ]);
 });

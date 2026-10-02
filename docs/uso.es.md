@@ -9,7 +9,7 @@
 - Node.js 20.9 o posterior y npm.
 - Un repositorio Git o Mercurial con identidad y remoto configurados.
 - Workspace limpio, incluidos los archivos no versionados.
-- Herramientas OpenSSH `ssh` y `sftp` y un alias configurado para el servidor remoto.
+- Herramienta OpenSSH `sftp` y un alias configurado para el servidor remoto.
 - Un script npm que compile y pruebe todos los artefactos necesarios.
 
 ## 3. Invocación

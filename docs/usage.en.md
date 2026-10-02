@@ -9,7 +9,7 @@
 - Node.js 20.9 or later and npm.
 - A Git or Mercurial repository with identity and remote configured.
 - A clean workspace, including untracked files.
-- OpenSSH `ssh` and `sftp` tools and a configured remote-server alias.
+- The OpenSSH `sftp` tool and a configured remote-server alias.
 - An npm script that builds and tests every required artifact.
 
 ## 3. Invocation

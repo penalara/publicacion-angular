@@ -1,12 +1,23 @@
 import { posix } from 'node:path';
 import { runProcess } from '../process.mjs';
 
-function shellQuote(value) {
-  return `'${value.replaceAll("'", `'\\''`)}'`;
+function sftpQuote(value) {
+  return `"${value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')
+    .replace(/[\*?\[\]]/gu, '\\$&')}"`;
 }
 
-function sftpQuote(value) {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+function parseListing(stdout) {
+  return stdout
+    .split(/\r?\n/u)
+    .filter((entry) => entry !== '' && entry !== '.' && entry !== '..')
+    .map((entry) => {
+      if (/^[\r\n\0]/u.test(entry) || posix.basename(entry) !== entry) {
+        throw new Error(`El servidor SFTP ha devuelto un nombre de fichero no valido: ${JSON.stringify(entry)}`);
+      }
+      return entry;
+    });
 }
 
 export class SftpTransport {
@@ -20,78 +31,97 @@ export class SftpTransport {
 
   async validatePrerequisites() {
     try {
-      await this.#run('ssh', ['-V'], { stdio: 'ignore' });
       await this.#run('sftp', ['-h'], { allowedExitCodes: [0, 1], stdio: 'ignore' });
     } catch (error) {
-      throw new Error('OpenSSH (ssh y sftp) no esta disponible en el sistema.', { cause: error });
+      throw new Error('OpenSSH SFTP no esta disponible en el sistema.', { cause: error });
     }
   }
 
   async connect() {
     try {
-      await this.#ssh(`test -d ${shellQuote(this.#config.remoteDirectory)}`);
+      await this.#sftp(`@ls ${sftpQuote(this.#config.remoteDirectory)}`);
     } catch (error) {
       throw new Error(
-        `No se ha podido conectar mediante el alias SSH "${this.#config.sshAlias}" o no existe "${this.#config.remoteDirectory}".`,
+        `No se ha podido conectar mediante el alias SFTP "${this.#config.sshAlias}" o no existe "${this.#config.remoteDirectory}".`,
         { cause: error },
       );
     }
   }
 
-  disconnect() {}
+  async disconnect() {}
 
   async exists(remotePath) {
     this.#assertManagedPath(remotePath);
-    return (await this.#ssh(`test -e ${shellQuote(remotePath)}`, [0, 1])).exitCode === 0;
+    return this.#exists(remotePath);
   }
 
   async uploadDirectory(localPath, remotePath) {
     this.#assertManagedPath(remotePath);
-    const command = `put -pR ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}\n`;
-    await this.#run('sftp', ['-b', '-', this.#config.sshAlias], { input: command });
+    await this.#sftp(`put -pR ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`);
   }
 
   async removeDirectory(remotePath) {
     this.#assertManagedPath(remotePath);
-    await this.#ssh(`rm -rf -- ${shellQuote(remotePath)}`);
+    await this.#removeDirectory(remotePath);
   }
 
   async rename(sourcePath, destinationPath) {
     this.#assertManagedPath(sourcePath);
     this.#assertManagedPath(destinationPath);
-    await this.#ssh(`mv -- ${shellQuote(sourcePath)} ${shellQuote(destinationPath)}`);
+    await this.#sftp(`rename ${sftpQuote(sourcePath)} ${sftpQuote(destinationPath)}`);
   }
 
   async fileExists(remotePath) {
     this.#assertLogPath(remotePath);
-    return (await this.#ssh(`test -f ${shellQuote(remotePath)}`, [0, 1])).exitCode === 0;
+    return this.#exists(remotePath);
   }
 
   async downloadFile(remotePath, localPath) {
     this.#assertLogPath(remotePath);
-    const command = `get -p ${sftpQuote(remotePath)} ${sftpQuote(localPath.replaceAll('\\', '/'))}\n`;
-    await this.#run('sftp', ['-b', '-', this.#config.sshAlias], { input: command });
+    await this.#sftp(`get -p ${sftpQuote(remotePath)} ${sftpQuote(localPath.replaceAll('\\', '/'))}`);
   }
 
   async uploadFile(localPath, remotePath) {
     this.#assertLogPath(remotePath);
-    const command = `put -p ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}\n`;
-    await this.#run('sftp', ['-b', '-', this.#config.sshAlias], { input: command });
+    await this.#sftp(`put -p ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`);
   }
 
   async removeFile(remotePath) {
     this.#assertLogPath(remotePath);
-    await this.#ssh(`rm -f -- ${shellQuote(remotePath)}`);
+    await this.#sftp(`rm ${sftpQuote(remotePath)}`);
   }
 
   async renameFile(sourcePath, destinationPath) {
     this.#assertLogPath(sourcePath);
     this.#assertLogPath(destinationPath);
-    await this.#ssh(`mv -- ${shellQuote(sourcePath)} ${shellQuote(destinationPath)}`);
+    await this.#sftp(`rename ${sftpQuote(sourcePath)} ${sftpQuote(destinationPath)}`);
   }
 
-  async #ssh(remoteCommand, allowedExitCodes = [0]) {
-    return this.#run('ssh', [this.#config.sshAlias, remoteCommand], { allowedExitCodes });
+  async #exists(remotePath) {
+    const result = await this.#sftp(`@ls ${sftpQuote(remotePath)}`, [0, 1]);
+    return result.exitCode === 0;
+  }
+
+  async #removeDirectory(remotePath) {
+    const entries = await this.#listDirectory(remotePath);
+    for (const entry of entries) {
+      const childPath = posix.join(remotePath, entry);
+      const result = await this.#sftp(`rm ${sftpQuote(childPath)}`, [0, 1]);
+      if (result.exitCode !== 0) await this.#removeDirectory(childPath);
+    }
+    await this.#sftp(`rmdir ${sftpQuote(remotePath)}`);
+  }
+
+  async #listDirectory(remotePath) {
+    const result = await this.#sftp(`@ls -1a ${sftpQuote(remotePath)}`);
+    return parseListing(result.stdout);
+  }
+
+  async #sftp(command, allowedExitCodes = [0]) {
+    return this.#run('sftp', ['-b', '-', this.#config.sshAlias], {
+      input: `${command}\n`,
+      allowedExitCodes,
+    });
   }
 
   #assertManagedPath(remotePath) {

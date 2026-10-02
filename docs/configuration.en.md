@@ -95,10 +95,9 @@ Host web-production
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-The account must support the SFTP subsystem and the remote POSIX commands `test`, `rm`, and `mv`. Verify access before publishing:
+The account only needs to support the SFTP subsystem. The publisher uses the SFTP commands `ls`, `put`, `get`, `rm`, `rmdir`, and `rename`; it does not execute a remote shell. Verify access before publishing:
 
 ```bash
-ssh web-production
 sftp web-production
 ```
 

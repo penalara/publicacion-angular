@@ -95,10 +95,9 @@ Host web-production
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-La cuenta debe permitir el subsistema SFTP y los comandos remotos POSIX `test`, `rm` y `mv`. Compruebe el acceso antes de publicar:
+La cuenta solo necesita permitir el subsistema SFTP. El publicador usa los comandos SFTP `ls`, `put`, `get`, `rm`, `rmdir` y `rename`; no ejecuta shell remota. Compruebe el acceso antes de publicar:
 
 ```bash
-ssh web-production
 sftp web-production
 ```
 
