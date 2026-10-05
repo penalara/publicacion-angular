@@ -43,7 +43,6 @@ const config = {
   versionBranch: 'versions-testing',
   vcs: { type: 'git', remote: 'origin' },
   sftpConfig: { sshAlias: 'web-testing', remoteDirectory: '/www' },
-  remoteLogPath: '/deployment.log',
 };
 
 async function fixture(callback) {

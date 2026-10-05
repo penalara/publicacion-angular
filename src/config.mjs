@@ -130,16 +130,9 @@ export async function loadPublicationConfig(
     ? undefined
     : requireString(vcsConfig, 'remote', 'la configuracion de VCS');
 
-  const logConfig = root.deploymentLog === undefined
-    ? {}
-    : requireObject(root.deploymentLog, 'La propiedad "deploymentLog"');
-  const configuredLogPath = logConfig.remotePath === undefined
-    ? '/despliegues-automaticos.log'
-    : requireString(logConfig, 'remotePath', 'la configuracion del log');
-  const remoteLogPath = validateRemotePath(
-    configuredLogPath,
-    'deploymentLog.remotePath',
-  );
+  if (root.deploymentLog !== undefined) {
+    throw new ConfigurationError('La propiedad "deploymentLog" ya no se admite.');
+  }
 
   const releaseConfig = root.release === undefined
     ? {}
@@ -168,7 +161,6 @@ export async function loadPublicationConfig(
     publicationBranch,
     versionBranch,
     vcs: { type: vcsType, remote: vcsRemote },
-    remoteLogPath,
     tagPrefix,
     sftpConfig: { sshAlias, remoteDirectory },
   };

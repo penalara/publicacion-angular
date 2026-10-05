@@ -58,7 +58,7 @@ All artifacts are uploaded as `<language>_new` before any active directory chang
 
 ## 7. Resume and push
 
-`--resume` continues a locally prepared release. New-version mode validates its local tag; no-version mode validates the prepared publication commit. Push only happens after deployment and remote logging succeed.
+`--resume` continues a locally prepared release. New-version mode validates its local tag; no-version mode validates the prepared publication commit. Push only happens after deployment succeeds.
 
 If the final push alone fails, deployment is already active. Follow the reported manual push instruction instead of publishing again.
 

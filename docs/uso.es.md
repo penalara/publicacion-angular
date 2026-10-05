@@ -43,7 +43,7 @@ El orden es:
 4. Crear `Preparamos version <versión>` en la rama origen.
 5. Crear `<name>-<versión>` sobre ese commit.
 6. Comprobar sin modificar el workspace que la rama de publicación no aporta cambios respecto al ancestro común.
-7. Transferir y activar los artefactos y actualizar el registro remoto.
+7. Transferir y activar los artefactos.
 8. Fusionar el origen en `publicationBranch`.
 9. Verificar que el árbol fusionado coincide con el origen.
 10. Crear `Publicamos version <versión> en <entorno>`.
@@ -90,7 +90,7 @@ Si el merge final falla de forma inesperada después de superar la prevalidació
 
 ## 8. Resultado y retorno
 
-El push solo se ejecuta después del despliegue y del registro remoto. Git envía atómicamente las ramas y el tag; Mercurial realiza un único `hg push`. Al terminar o fallar, el workspace vuelve a la rama origen siempre que el VCS lo permita.
+El push solo se ejecuta después del despliegue. Git envía atómicamente las ramas y el tag; Mercurial realiza un único `hg push`. Al terminar o fallar, el workspace vuelve a la rama origen siempre que el VCS lo permita.
 
 ## 9. Automatización
 

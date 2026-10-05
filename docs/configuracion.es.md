@@ -18,9 +18,6 @@ Las rutas locales son relativas a la raíz desde la que se ejecuta npm.
     "type": "git",
     "remote": "origin"
   },
-  "deploymentLog": {
-    "remotePath": "/despliegues-automaticos.log"
-  },
   "release": {
     "tagPrefix": "example-angular-app"
   },
@@ -107,13 +104,7 @@ La publicación exige un workspace limpio. La rama de publicación debe existir 
 
 El tag de `--new-version` es `${release.tagPrefix}-${version}` cuando se configura ese valor. Si se omite, es `${name}-${version}`, donde `name` procede del `package.json`.
 
-## 7. Registro remoto
-
-`deploymentLog.remotePath` debe ser una ruta absoluta. El fichero contiene versión, revisión, usuario del sistema y fecha local. Su actualización usa los sufijos `_new` y `_old` y dispone de rollback propio.
-
-La cuenta remota necesita permisos de lectura, escritura, eliminación y renombrado tanto en `sftpConfig.remoteDirectory` como en la ruta del log.
-
-## 8. Seguridad
+## 7. Seguridad
 
 - No desactive la comprobación de claves de host SSH.
 - No comparta claves privadas ni frases de contraseña.

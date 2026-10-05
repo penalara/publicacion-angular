@@ -1,6 +1,5 @@
 import { posix } from 'node:path';
 import { ActivationRollbackError } from './errors.mjs';
-import { prepareRemoteDeploymentLog } from './deployment-log.mjs';
 
 export async function publishArtifacts({ transport, artifacts, remoteDirectory, log = console.log }) {
   log('Subiendo nuevas versiones...');
@@ -71,38 +70,16 @@ async function recoverAmbiguousBackup(transport, name, activePath, oldPath, back
   });
 }
 
-export async function deploy({ config, version, revision, artifacts, transport, log = console.log }) {
+export async function deploy({ config, artifacts, transport, log = console.log }) {
   await transport.validatePrerequisites();
   await transport.connect();
   try {
-    const deploymentLog = await prepareRemoteDeploymentLog(transport, {
-      version,
-      revision,
-      remotePath: config.remoteLogPath,
+    await publishArtifacts({
+      transport,
+      artifacts,
+      remoteDirectory: config.sftpConfig.remoteDirectory,
+      log,
     });
-    let deploymentError;
-    try {
-      await publishArtifacts({
-        transport,
-        artifacts,
-        remoteDirectory: config.sftpConfig.remoteDirectory,
-        log,
-      });
-      await deploymentLog.publish();
-      log(`Despliegue registrado: ${deploymentLog.line}`);
-    } catch (error) {
-      deploymentError = error;
-      throw error;
-    } finally {
-      try {
-        await deploymentLog.cleanup();
-      } catch (cleanupError) {
-        if (deploymentError) {
-          throw new AggregateError([deploymentError, cleanupError], 'Fallo la publicacion y la limpieza temporal.');
-        }
-        throw cleanupError;
-      }
-    }
   } finally {
     await transport.disconnect();
   }

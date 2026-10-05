@@ -13,7 +13,7 @@ test('resuelve npm mediante su CLI JavaScript en Windows', () => {
   });
 });
 
-test('SFTP usa solo comandos SFTP y rutas configurables de log', async () => {
+test('SFTP usa solo comandos SFTP', async () => {
   const calls = [];
   const run = async (command, args, options = {}) => {
     calls.push({ command, args, options });
@@ -22,12 +22,10 @@ test('SFTP usa solo comandos SFTP y rutas configurables de log', async () => {
   const transport = new SftpTransport({
     sshAlias: 'web-production',
     remoteDirectory: '/www/application',
-    remoteLogPath: '/logs/deployment.log',
   }, run);
   await transport.validatePrerequisites();
   await transport.connect();
   await transport.uploadDirectory('C:\\build path\\es', '/www/application/es_new');
-  await transport.fileExists('/logs/deployment.log');
   assert.equal(calls.some(({ command }) => command === 'ssh'), false);
   assert(calls.some(({ command, options }) =>
     command === 'sftp' && options.input?.includes('C:/build path/es'),
@@ -54,7 +52,6 @@ test('SFTP elimina directorios de forma recursiva', async () => {
   const transport = new SftpTransport({
     sshAlias: 'web-production',
     remoteDirectory: '/www/application',
-    remoteLogPath: '/logs/deployment.log',
   }, run);
 
   await transport.removeDirectory('/www/application/es_new');
@@ -87,7 +84,6 @@ test('SFTP acepta listados con rutas completas', async () => {
   const transport = new SftpTransport({
     sshAlias: 'web-production',
     remoteDirectory: '/ghcmppruebas/public_html',
-    remoteLogPath: '/logs/deployment.log',
   }, run);
 
   await transport.removeDirectory(remoteDirectory);

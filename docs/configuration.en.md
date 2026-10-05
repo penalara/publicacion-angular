@@ -18,9 +18,6 @@ Local paths are relative to the directory from which npm runs.
     "type": "git",
     "remote": "origin"
   },
-  "deploymentLog": {
-    "remotePath": "/deployment.log"
-  },
   "release": {
     "tagPrefix": "example-angular-app"
   },
@@ -107,13 +104,7 @@ Publication requires a clean workspace. The publication branch must exist locall
 
 New-version tags use `${release.tagPrefix}-${version}` when configured. Otherwise they use `${name}-${version}`, where `name` comes from the consumer's `package.json`.
 
-## 7. Remote log
-
-`deploymentLog.remotePath` must be absolute. Each line records version, revision, operating-system user, and local date. The log itself is activated through `_new` and `_old` files with rollback.
-
-The remote account needs read, write, remove, and rename permissions for both `sftpConfig.remoteDirectory` and the log path.
-
-## 8. Security
+## 7. Security
 
 - Keep normal SSH host-key verification enabled.
 - Never share private keys or passphrases.

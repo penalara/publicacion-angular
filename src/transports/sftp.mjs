@@ -78,32 +78,6 @@ export class SftpTransport {
     await this.#sftp(`rename ${sftpQuote(sourcePath)} ${sftpQuote(destinationPath)}`);
   }
 
-  async fileExists(remotePath) {
-    this.#assertLogPath(remotePath);
-    return this.#exists(remotePath);
-  }
-
-  async downloadFile(remotePath, localPath) {
-    this.#assertLogPath(remotePath);
-    await this.#sftp(`get -p ${sftpQuote(remotePath)} ${sftpQuote(localPath.replaceAll('\\', '/'))}`);
-  }
-
-  async uploadFile(localPath, remotePath) {
-    this.#assertLogPath(remotePath);
-    await this.#sftp(`put -p ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`);
-  }
-
-  async removeFile(remotePath) {
-    this.#assertLogPath(remotePath);
-    await this.#sftp(`rm ${sftpQuote(remotePath)}`);
-  }
-
-  async renameFile(sourcePath, destinationPath) {
-    this.#assertLogPath(sourcePath);
-    this.#assertLogPath(destinationPath);
-    await this.#sftp(`rename ${sftpQuote(sourcePath)} ${sftpQuote(destinationPath)}`);
-  }
-
   async #exists(remotePath) {
     const result = await this.#sftp(`@ls ${sftpQuote(remotePath)}`, [0, 1]);
     return result.exitCode === 0;
@@ -137,12 +111,4 @@ export class SftpTransport {
     }
   }
 
-  #assertLogPath(remotePath) {
-    const allowed = new Set([
-      this.#config.remoteLogPath,
-      `${this.#config.remoteLogPath}_new`,
-      `${this.#config.remoteLogPath}_old`,
-    ]);
-    if (!allowed.has(remotePath)) throw new Error(`Ruta de log remoto no permitida: ${remotePath}`);
-  }
 }

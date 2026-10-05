@@ -28,9 +28,6 @@ La configuración se guarda en `tools/publicacion/publicacion.config.json` y usa
   "vcs": {
     "type": "auto"
   },
-  "deploymentLog": {
-    "remotePath": "/despliegues-automaticos.log"
-  },
   "release": {
     "tagPrefix": "example-angular-app"
   },

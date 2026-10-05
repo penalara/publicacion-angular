@@ -7,7 +7,6 @@ import { loadPublicationConfig } from '../src/config.mjs';
 
 const baseConfig = {
   vcs: { type: 'mercurial', remote: 'default' },
-  deploymentLog: { remotePath: '/deployment.log' },
   environments: {
     pruebas: {
       name: 'Pruebas',
@@ -59,6 +58,15 @@ test('rechaza la configuracion transport anterior', async () => {
     invalid.environments.pruebas.transport = { type: 'ftp' };
     await writeFile(configPath, JSON.stringify(invalid));
     await assert.rejects(loadPublicationConfig('pruebas', { configPath }), /transport.*sftpConfig/u);
+  });
+});
+
+test('rechaza la configuracion de log remoto anterior', async () => {
+  await withFiles(async ({ configPath }) => {
+    const invalid = structuredClone(baseConfig);
+    invalid.deploymentLog = { remotePath: '/deployment.log' };
+    await writeFile(configPath, JSON.stringify(invalid));
+    await assert.rejects(loadPublicationConfig('pruebas', { configPath }), /deploymentLog/u);
   });
 });
 
