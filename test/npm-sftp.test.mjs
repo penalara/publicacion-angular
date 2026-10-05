@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import { resolveNpmInvocation } from '../src/npm-runner.mjs';
 import { SftpTransport } from '../src/transports/sftp.mjs';
@@ -13,7 +16,17 @@ test('resuelve npm mediante su CLI JavaScript en Windows', () => {
   });
 });
 
-test('SFTP usa solo comandos SFTP', async () => {
+async function createArtifact(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'penalara-publicacion-'));
+  const artifact = join(directory, 'es');
+  await mkdir(join(artifact, 'assets'), { recursive: true });
+  await writeFile(join(artifact, 'index.html'), '<html></html>');
+  await writeFile(join(artifact, 'assets', 'main.js'), 'console.log(1);');
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  return artifact;
+}
+
+test('SFTP usa solo comandos SFTP y normaliza permisos', async (t) => {
   const calls = [];
   const run = async (command, args, options = {}) => {
     calls.push({ command, args, options });
@@ -25,12 +38,16 @@ test('SFTP usa solo comandos SFTP', async () => {
   }, run);
   await transport.validatePrerequisites();
   await transport.connect();
-  await transport.uploadDirectory('C:\\build path\\es', '/www/application/es_new');
+  const localArtifact = await createArtifact(t);
+  await transport.uploadDirectory(localArtifact, '/www/application/es_new');
   assert.equal(calls.some(({ command }) => command === 'ssh'), false);
   assert(calls.some(({ command, options }) =>
-    command === 'sftp' && options.input?.includes('C:/build path/es'),
+    command === 'sftp' && options.input?.includes(localArtifact.replaceAll('\\', '/')),
   ));
   assert.equal(calls.some(({ options }) => options.input?.includes('put -p')), false);
+  assert(calls.some(({ options }) => options.input?.includes(
+    'chmod 2775 "/www/application/es_new"\nchmod 2775 "/www/application/es_new/assets"\nchmod 664 "/www/application/es_new/assets/main.js"\nchmod 664 "/www/application/es_new/index.html"\n',
+  )));
   assert(calls.some(({ options }) => options.input === '@ls "/www/application"\n'));
 });
 
@@ -96,7 +113,7 @@ test('SFTP acepta listados con rutas completas', async () => {
   ]);
 });
 
-test('SFTP agrupa inspeccion, subida y renombrados', async () => {
+test('SFTP agrupa inspeccion, subida, permisos y renombrados', async (t) => {
   const calls = [];
   const run = async (command, args, options = {}) => {
     calls.push({ command, args, options });
@@ -113,14 +130,17 @@ test('SFTP agrupa inspeccion, subida y renombrados', async () => {
     sshAlias: 'web-production',
     remoteDirectory: '/www/application',
   }, run);
+  const localArtifact = await createArtifact(t);
 
   const state = await transport.inspectDirectories(['/www/application/es_new', '/www/application/es']);
-  await transport.uploadDirectories([{ localPath: '/local/es', remotePath: '/www/application/es_new' }]);
+  await transport.uploadDirectories([{ localPath: localArtifact, remotePath: '/www/application/es_new' }]);
   await transport.renameMany([{ sourcePath: '/www/application/es_new', destinationPath: '/www/application/es' }]);
 
   assert.equal(state.get('/www/application/es_new'), false);
   assert.equal(state.get('/www/application/es'), true);
   assert.equal(calls[0].options.input, 'cd "/www/application"\n-cd "/www/application/es_new"\npwd\ncd "/www/application"\n-cd "/www/application/es"\npwd\ncd "/www/application"\n');
-  assert.equal(calls[1].options.input, 'put -R "/local/es" "/www/application/es_new"\n');
-  assert.equal(calls[2].options.input, 'rename "/www/application/es_new" "/www/application/es"\n');
+  assert.equal(calls[1].options.input, `put -R "${localArtifact.replaceAll('\\', '/')}" "/www/application/es_new"\n`);
+  assert(calls[2].options.input.includes('chmod 2775 "/www/application/es_new"'));
+  assert(calls[2].options.input.includes('chmod 664 "/www/application/es_new/index.html"'));
+  assert.equal(calls[3].options.input, 'rename "/www/application/es_new" "/www/application/es"\n');
 });

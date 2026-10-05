@@ -1,4 +1,5 @@
 import { posix } from 'node:path';
+import { readdir } from 'node:fs/promises';
 import { runProcess } from '../process.mjs';
 
 function sftpQuote(value) {
@@ -86,6 +87,7 @@ export class SftpTransport {
   async uploadDirectory(localPath, remotePath) {
     this.#assertManagedPath(remotePath);
     await this.#sftp(`put -R ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`);
+    await this.#setPermissions(localPath, remotePath);
   }
 
   async uploadDirectories(entries) {
@@ -93,6 +95,9 @@ export class SftpTransport {
     await this.#sftp(entries.map(({ localPath, remotePath }) => (
       `put -R ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`
     )));
+    await this.#sftp((await Promise.all(entries.map(({ localPath, remotePath }) => (
+      this.#permissionCommands(localPath, remotePath)
+    )))).flat());
   }
 
   async removeDirectory(remotePath) {
@@ -134,6 +139,24 @@ export class SftpTransport {
   async #listDirectory(remotePath) {
     const result = await this.#sftp(`@ls -1a ${sftpQuote(remotePath)}`);
     return parseListing(result.stdout, remotePath);
+  }
+
+  async #setPermissions(localPath, remotePath) {
+    await this.#sftp(await this.#permissionCommands(localPath, remotePath));
+  }
+
+  async #permissionCommands(localPath, remotePath) {
+    const commands = [`chmod 2775 ${sftpQuote(remotePath)}`];
+    for (const entry of await readdir(localPath, { withFileTypes: true })) {
+      const childLocalPath = `${localPath}${localPath.includes('\\') ? '\\' : '/'}${entry.name}`;
+      const childRemotePath = posix.join(remotePath, entry.name);
+      if (entry.isDirectory()) {
+        commands.push(...await this.#permissionCommands(childLocalPath, childRemotePath));
+      } else if (entry.isFile()) {
+        commands.push(`chmod 664 ${sftpQuote(childRemotePath)}`);
+      }
+    }
+    return commands;
   }
 
   async #sftp(commands, allowedExitCodes = [0]) {
