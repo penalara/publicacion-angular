@@ -85,13 +85,13 @@ export class SftpTransport {
 
   async uploadDirectory(localPath, remotePath) {
     this.#assertManagedPath(remotePath);
-    await this.#sftp(`put -pR ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`);
+    await this.#sftp(`put -R ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`);
   }
 
   async uploadDirectories(entries) {
     for (const { remotePath } of entries) this.#assertManagedPath(remotePath);
     await this.#sftp(entries.map(({ localPath, remotePath }) => (
-      `put -pR ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`
+      `put -R ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`
     )));
   }
 

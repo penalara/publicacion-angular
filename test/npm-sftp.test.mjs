@@ -30,6 +30,7 @@ test('SFTP usa solo comandos SFTP', async () => {
   assert(calls.some(({ command, options }) =>
     command === 'sftp' && options.input?.includes('C:/build path/es'),
   ));
+  assert.equal(calls.some(({ options }) => options.input?.includes('put -p')), false);
   assert(calls.some(({ options }) => options.input === '@ls "/www/application"\n'));
 });
 
@@ -120,6 +121,6 @@ test('SFTP agrupa inspeccion, subida y renombrados', async () => {
   assert.equal(state.get('/www/application/es_new'), false);
   assert.equal(state.get('/www/application/es'), true);
   assert.equal(calls[0].options.input, 'cd "/www/application"\n-cd "/www/application/es_new"\npwd\ncd "/www/application"\n-cd "/www/application/es"\npwd\ncd "/www/application"\n');
-  assert.equal(calls[1].options.input, 'put -pR "/local/es" "/www/application/es_new"\n');
+  assert.equal(calls[1].options.input, 'put -R "/local/es" "/www/application/es_new"\n');
   assert.equal(calls[2].options.input, 'rename "/www/application/es_new" "/www/application/es"\n');
 });
