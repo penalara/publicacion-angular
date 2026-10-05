@@ -62,9 +62,37 @@ export class SftpTransport {
     return this.#exists(remotePath);
   }
 
+  async inspectDirectories(remotePaths) {
+    for (const remotePath of remotePaths) this.#assertManagedPath(remotePath);
+    const commands = [`cd ${sftpQuote(this.#config.remoteDirectory)}`];
+    for (const remotePath of remotePaths) {
+      commands.push(`-cd ${sftpQuote(remotePath)}`, 'pwd', `cd ${sftpQuote(this.#config.remoteDirectory)}`);
+    }
+    const result = await this.#sftp(commands);
+    const directories = result.stdout
+      .split(/\r?\n/u)
+      .map((line) => /^Remote working directory: (.+)$/u.exec(line)?.[1])
+      .filter(Boolean)
+      .map((directory) => posix.normalize(directory));
+    if (directories.length !== remotePaths.length) {
+      throw new Error('La respuesta SFTP no contiene el estado esperado de los directorios remotos.');
+    }
+    return new Map(remotePaths.map((remotePath, index) => [
+      remotePath,
+      directories[index] === posix.normalize(remotePath),
+    ]));
+  }
+
   async uploadDirectory(localPath, remotePath) {
     this.#assertManagedPath(remotePath);
     await this.#sftp(`put -pR ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`);
+  }
+
+  async uploadDirectories(entries) {
+    for (const { remotePath } of entries) this.#assertManagedPath(remotePath);
+    await this.#sftp(entries.map(({ localPath, remotePath }) => (
+      `put -pR ${sftpQuote(localPath.replaceAll('\\', '/'))} ${sftpQuote(remotePath)}`
+    )));
   }
 
   async removeDirectory(remotePath) {
@@ -76,6 +104,16 @@ export class SftpTransport {
     this.#assertManagedPath(sourcePath);
     this.#assertManagedPath(destinationPath);
     await this.#sftp(`rename ${sftpQuote(sourcePath)} ${sftpQuote(destinationPath)}`);
+  }
+
+  async renameMany(entries) {
+    for (const { sourcePath, destinationPath } of entries) {
+      this.#assertManagedPath(sourcePath);
+      this.#assertManagedPath(destinationPath);
+    }
+    await this.#sftp(entries.map(({ sourcePath, destinationPath }) => (
+      `rename ${sftpQuote(sourcePath)} ${sftpQuote(destinationPath)}`
+    )));
   }
 
   async #exists(remotePath) {
@@ -98,9 +136,10 @@ export class SftpTransport {
     return parseListing(result.stdout, remotePath);
   }
 
-  async #sftp(command, allowedExitCodes = [0]) {
+  async #sftp(commands, allowedExitCodes = [0]) {
+    const batch = Array.isArray(commands) ? commands : [commands];
     return this.#run('sftp', ['-b', '-', this.#config.sshAlias], {
-      input: `${command}\n`,
+      input: `${batch.join('\n')}\n`,
       allowedExitCodes,
     });
   }

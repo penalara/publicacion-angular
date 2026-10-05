@@ -94,3 +94,32 @@ test('SFTP acepta listados con rutas completas', async () => {
     `rmdir "${remoteDirectory}"\n`,
   ]);
 });
+
+test('SFTP agrupa inspeccion, subida y renombrados', async () => {
+  const calls = [];
+  const run = async (command, args, options = {}) => {
+    calls.push({ command, args, options });
+    if (options.input?.includes('pwd')) {
+      return {
+        exitCode: 0,
+        stdout: 'Remote working directory: /www/application\nRemote working directory: /www/application/es\n',
+        stderr: '',
+      };
+    }
+    return { exitCode: 0, stdout: '', stderr: '' };
+  };
+  const transport = new SftpTransport({
+    sshAlias: 'web-production',
+    remoteDirectory: '/www/application',
+  }, run);
+
+  const state = await transport.inspectDirectories(['/www/application/es_new', '/www/application/es']);
+  await transport.uploadDirectories([{ localPath: '/local/es', remotePath: '/www/application/es_new' }]);
+  await transport.renameMany([{ sourcePath: '/www/application/es_new', destinationPath: '/www/application/es' }]);
+
+  assert.equal(state.get('/www/application/es_new'), false);
+  assert.equal(state.get('/www/application/es'), true);
+  assert.equal(calls[0].options.input, 'cd "/www/application"\n-cd "/www/application/es_new"\npwd\ncd "/www/application"\n-cd "/www/application/es"\npwd\ncd "/www/application"\n');
+  assert.equal(calls[1].options.input, 'put -pR "/local/es" "/www/application/es_new"\n');
+  assert.equal(calls[2].options.input, 'rename "/www/application/es_new" "/www/application/es"\n');
+});

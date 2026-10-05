@@ -21,6 +21,23 @@ class FakeTransport {
   }
 }
 
+class BatchedFakeTransport extends FakeTransport {
+  async inspectDirectories(paths) {
+    this.operations.push(['inspect', paths]);
+    return new Map(paths.map((path) => [path, this.paths.has(path)]));
+  }
+
+  async uploadDirectories(entries) {
+    this.operations.push(['upload-many', entries]);
+    for (const { localPath, remotePath } of entries) await this.uploadDirectory(localPath, remotePath);
+  }
+
+  async renameMany(entries) {
+    this.operations.push(['rename-many', entries]);
+    for (const { sourcePath, destinationPath } of entries) await this.rename(sourcePath, destinationPath);
+  }
+}
+
 const options = (transport) => ({
   transport,
   artifacts: [{ name: 'es', localDirectory: '/local/es' }],
@@ -33,6 +50,19 @@ test('publica mediante new, activo y old', async () => {
   await publishArtifacts(options(transport));
   assert(transport.paths.has('/www/es'));
   assert(transport.paths.has('/www/es_old'));
+});
+
+test('agrupa inspeccion, subida y activacion cuando el transporte lo permite', async () => {
+  const transport = new BatchedFakeTransport(['/www/es']);
+  await publishArtifacts(options(transport));
+  assert.deepEqual(transport.operations.map(([operation]) => operation), [
+    'inspect',
+    'upload-many',
+    'upload',
+    'rename-many',
+    'rename',
+    'rename',
+  ]);
 });
 
 test('restaura el activo si falla la activacion', async () => {
