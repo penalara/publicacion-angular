@@ -2,14 +2,14 @@
 
 ## 1. Objetivo
 
-`@penalara/publicacion-angular` compila una aplicación, descubre sus artefactos estáticos y los activa mediante SFTP en un servidor remoto mediante directorios `<idioma>_new`, `<idioma>` y `<idioma>_old`. El mismo flujo funciona con Git y Mercurial.
+`@penalara/publicacion-angular` compila una aplicación, descubre sus artefactos estáticos y los activa en un servidor remoto mediante directorios `<idioma>_new`, `<idioma>` y `<idioma>_old`. SFTP transfiere los artefactos y SSH opera sobre los directorios remotos. El mismo flujo funciona con Git y Mercurial.
 
 ## 2. Requisitos
 
 - Node.js 20.9 o posterior y npm.
-- Un repositorio Git o Mercurial con identidad y remoto configurados.
-- Workspace limpio, incluidos los archivos no versionados.
-- Herramienta OpenSSH `sftp` y un alias configurado para el servidor remoto.
+- Un repositorio Git o Mercurial con identidad y remoto configurados, salvo en `--no-vsc-force`.
+- Workspace limpio, incluidos los archivos no versionados, salvo en `--no-vsc-force`.
+- Herramientas OpenSSH `sftp` y `ssh`, y un alias configurado para el servidor remoto.
 - Un script npm que compile y pruebe todos los artefactos necesarios.
 
 ## 3. Invocación
@@ -25,6 +25,7 @@ npm run publicar:pruebas -- --new-version 2.1.0
 npm run publicar:pruebas -- --new-version
 npm run publicar:pruebas -- --no-version
 npm run publicar:pruebas -- --resume --new-version 2.1.0
+npm run publicar:pruebas -- --no-vsc-force
 ```
 
 El entorno selecciona una entrada de `publicacion.config.json`.
@@ -62,6 +63,14 @@ El build y las pruebas se ejecutan antes de cambiar de rama. Si terminan correct
 - Un flag explícito siempre prevalece.
 - `--new-version` y `--no-version` no pueden combinarse.
 
+### `--no-vsc-force`
+
+Publica la versión SemVer actual de `package.json` sin detectar Git ni Mercurial. No consulta ni cambia ramas, no exige un workspace limpio, no crea commits o tags, no fusiona y no hace push. Ejecuta build, valida artefactos y realiza el despliegue remoto normal.
+
+No admite una versión posicional, `--new-version` ni `--resume`. `--no-version` se acepta como redundante. Tampoco admite `--allow-nonstandard-source`, ya que no hay rama que autorizar.
+
+Es un modo deliberadamente sin trazabilidad VCS: publica exactamente los artefactos generados en el workspace actual.
+
 ## 5. Ramas y confirmaciones
 
 Git considera estándar `main` y `master`; Mercurial considera estándar `default`. Una rama origen diferente requiere confirmación interactiva o `--allow-nonstandard-source`. La `versionBranch` configurada está autorizada y no muestra esa advertencia.
@@ -72,7 +81,7 @@ La rama de publicación debe existir. El publicador nunca la crea. Antes de cone
 
 ## 6. Transferencia y activación
 
-Primero se transfieren todos los artefactos como `<idioma>_new`. Solo cuando todas las subidas terminan se activa cada idioma:
+Primero se eliminan por SSH los restos `<idioma>_new` y se transfieren todos los artefactos por SFTP como `<idioma>_new`. Solo cuando todas las subidas terminan, SSH normaliza permisos con `2775` para directorios y `664` para ficheros. Después se activa cada idioma por SSH:
 
 1. Se elimina el `<idioma>_old` anterior.
 2. Se mueve `<idioma>` a `<idioma>_old` si existe.

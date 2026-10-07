@@ -69,7 +69,7 @@ It may also occur inside a directory name:
 
 Detected identifiers accept letters, digits, dots, hyphens, and underscores. `_new` and `_old` are reserved.
 
-## 5. SFTP
+## 5. SFTP and SSH
 
 ```json
 {
@@ -80,7 +80,7 @@ Detected identifiers accept letters, digits, dots, hyphens, and underscores. `_n
 }
 ```
 
-SFTP uses an alias from the user's OpenSSH configuration. No credentials are read from or stored in the repository or npm files.
+SFTP and SSH reuse the same alias from the user's OpenSSH configuration. No credentials are read from or stored in the repository or npm files.
 
 The alias is normally configured in `~/.ssh/config`:
 
@@ -92,10 +92,28 @@ Host web-production
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-The account only needs to support the SFTP subsystem. The publisher uses the SFTP commands `ls`, `put`, `get`, `rm`, `rmdir`, and `rename`; it does not execute a remote shell. Verify access before publishing:
+SFTP only connects and transfers `<language>_new` directories. SSH removes leftovers, normalizes permissions, moves directories, and restores the previous version if activation fails. The remote user authenticates with a public key, needs no TTY or forwarding, and must be able to execute a compatible shell plus `rm`, `mv`, `find`, and `chmod` inside the chroot when one is used.
+
+`ForceCommand internal-sftp` is incompatible with this publisher because it prevents the required SSH operations. The chroot may remain in place when it contains the required shell and commands and the user has access to `remoteDirectory`.
+
+A reference configuration retains public-key authentication, chrooting, no TTY, and no forwarding, but does not force `internal-sftp` for this user:
+
+```sshconfig
+Match Group web-deployment
+    ChrootDirectory /srv/sftp/%u
+    AuthenticationMethods publickey
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    DisableForwarding yes
+    PermitTTY no
+```
+
+Verify both accesses before publishing:
 
 ```bash
 sftp web-production
+ssh -T web-production "true"
 ```
 
 ## 6. VCS and branches
@@ -104,8 +122,11 @@ Publication requires a clean workspace. The publication branch must exist locall
 
 New-version tags use `${release.tagPrefix}-${version}` when configured. Otherwise they use `${name}-${version}`, where `name` comes from the consumer's `package.json`.
 
+`--no-vsc-force` completely bypasses these VCS requirements and operations. It still requires the environment configuration, `package.json`, the build, and SFTP+SSH access.
+
 ## 7. Security
 
 - Keep normal SSH host-key verification enabled.
 - Never share private keys or passphrases.
 - Inspect the remote state before retrying after a rollback error.
+- Do not use `ForceCommand internal-sftp` for the account running this publisher.

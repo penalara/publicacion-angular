@@ -2,14 +2,14 @@
 
 ## 1. Purpose
 
-`@penalara/publicacion-angular` builds an application, discovers its static artifacts, and activates them over SFTP on a remote server through `<language>_new`, `<language>`, and `<language>_old` directories. The same workflow supports Git or Mercurial.
+`@penalara/publicacion-angular` builds an application, discovers its static artifacts, and activates them on a remote server through `<language>_new`, `<language>`, and `<language>_old` directories. SFTP transfers artifacts and SSH operates on remote directories. The same workflow supports Git or Mercurial.
 
 ## 2. Requirements
 
 - Node.js 20.9 or later and npm.
-- A Git or Mercurial repository with identity and remote configured.
-- A clean workspace, including untracked files.
-- The OpenSSH `sftp` tool and a configured remote-server alias.
+- A Git or Mercurial repository with identity and remote configured, except with `--no-vsc-force`.
+- A clean workspace, including untracked files, except with `--no-vsc-force`.
+- The OpenSSH `sftp` and `ssh` tools and a configured remote-server alias.
 - An npm script that builds and tests every required artifact.
 
 ## 3. Invocation
@@ -23,6 +23,7 @@ npm run publish:testing -- --new-version 2.1.0
 npm run publish:testing -- --new-version
 npm run publish:testing -- --no-version
 npm run publish:testing -- --resume --new-version 2.1.0
+npm run publish:testing -- --no-vsc-force
 ```
 
 The environment selects an entry from `publicacion.config.json`.
@@ -46,6 +47,14 @@ This mode uses the current valid SemVer from `package.json`. It rejects a positi
 - An explicit flag always wins.
 - Both flags are mutually exclusive.
 
+### `--no-vsc-force`
+
+This publishes the current SemVer from `package.json` without detecting Git or Mercurial. It does not inspect or switch branches, require a clean workspace, create commits or tags, merge, or push. It still builds, validates artifacts, and performs the normal remote deployment.
+
+It rejects a positional version, `--new-version`, and `--resume`. `--no-version` is accepted as redundant. It also rejects `--allow-nonstandard-source`, because no branch exists to authorize.
+
+This deliberately has no VCS traceability: it publishes exactly the artifacts built from the current workspace.
+
 ## 5. Branches and confirmation
 
 Git treats `main` and `master` as standard source branches; Mercurial uses `default`. Any other source requires interactive confirmation or `--allow-nonstandard-source`. A configured `versionBranch` is explicitly authorized.
@@ -54,7 +63,7 @@ Running directly from `publicationBranch` also requires confirmation and produce
 
 ## 6. Transfer and activation
 
-All artifacts are uploaded as `<language>_new` before any active directory changes. Activation retains the prior directory as `<language>_old` and attempts immediate rollback when the final rename fails. Never run concurrent publications against the same destination.
+SSH removes stale `<language>_new` directories, then all artifacts are uploaded by SFTP as `<language>_new` before any active directory changes. SSH normalizes directories to `2775` and files to `664`, then activation retains the prior directory as `<language>_old` and attempts immediate rollback when the final rename fails. Never run concurrent publications against the same destination.
 
 ## 7. Resume and push
 

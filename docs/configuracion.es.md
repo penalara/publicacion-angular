@@ -69,7 +69,7 @@ También puede formar parte de un nombre de directorio:
 
 Los identificadores detectados solo admiten letras, números, punto, guion y guion bajo. `_new` y `_old` están reservados.
 
-## 5. SFTP
+## 5. SFTP y SSH
 
 ```json
 {
@@ -80,7 +80,7 @@ Los identificadores detectados solo admiten letras, números, punto, guion y gui
 }
 ```
 
-SFTP usa un alias de la configuración OpenSSH del usuario. No se leen ni almacenan credenciales en el repositorio ni en ficheros de npm.
+SFTP y SSH reutilizan el mismo alias de la configuración OpenSSH del usuario. No se leen ni almacenan credenciales en el repositorio ni en ficheros de npm.
 
 El alias se configura normalmente en `~/.ssh/config`:
 
@@ -92,10 +92,28 @@ Host web-production
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-La cuenta solo necesita permitir el subsistema SFTP. El publicador usa los comandos SFTP `ls`, `put`, `get`, `rm`, `rmdir` y `rename`; no ejecuta shell remota. Compruebe el acceso antes de publicar:
+SFTP solo conecta y transfiere los directorios `<idioma>_new`. SSH elimina restos, normaliza permisos, mueve directorios y restaura una versión anterior si falla la activación. El usuario remoto se autentica con clave pública, no necesita TTY ni forwarding y debe poder ejecutar, dentro del chroot si se usa, `rm`, `mv`, `find` y `chmod` además de una shell compatible.
+
+`ForceCommand internal-sftp` no es compatible con este publicador porque impide las operaciones SSH requeridas. El chroot puede mantenerse, siempre que incluya la shell y los comandos indicados y el usuario tenga permisos sobre `remoteDirectory`.
+
+Una configuración de referencia conserva autenticación por clave, chroot, ausencia de TTY y forwarding, pero no fuerza `internal-sftp` para este usuario:
+
+```sshconfig
+Match Group despliegue-web
+    ChrootDirectory /srv/sftp/%u
+    AuthenticationMethods publickey
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    DisableForwarding yes
+    PermitTTY no
+```
+
+Compruebe ambos accesos antes de publicar:
 
 ```bash
 sftp web-production
+ssh -T web-production "true"
 ```
 
 ## 6. Ramas y VCS
@@ -104,8 +122,11 @@ La publicación exige un workspace limpio. La rama de publicación debe existir 
 
 El tag de `--new-version` es `${release.tagPrefix}-${version}` cuando se configura ese valor. Si se omite, es `${name}-${version}`, donde `name` procede del `package.json`.
 
+`--no-vsc-force` omite por completo estos requisitos y operaciones VCS. Sigue requiriendo la configuración de entorno, `package.json`, el build y el acceso SFTP+SSH.
+
 ## 7. Seguridad
 
 - No desactive la comprobación de claves de host SSH.
 - No comparta claves privadas ni frases de contraseña.
 - Revise manualmente cualquier fallo de rollback antes de repetir una publicación.
+- No use `ForceCommand internal-sftp` para el usuario que ejecuta este publicador.

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { runRelease } from '../src/release.mjs';
+import { runForcedRelease, runRelease } from '../src/release.mjs';
 
 class FakeVcs {
   type = 'git';
@@ -234,5 +234,32 @@ test('la prevalidacion del merge falla antes de conectar', async () => {
     );
     assert.equal(vcs.events.includes('deploy'), false);
     assert.equal(vcs.events.some((event) => event.startsWith('checkout:')), false);
+  });
+});
+
+test('no-vsc-force publica la version actual sin operaciones VCS', async () => {
+  await fixture(async (cwd) => {
+    const events = [];
+    const logs = [];
+    await runForcedRelease({
+      config,
+      cwd,
+      build: async () => { events.push('build'); },
+      findArtifacts: async () => {
+        events.push('artifacts');
+        return [{ name: 'es', localDirectory: '/tmp/es' }];
+      },
+      transportFactory: () => {
+        events.push('transport');
+        return {};
+      },
+      deployPublication: async ({ version, artifacts }) => {
+        events.push(`deploy:${version}:${artifacts[0].name}`);
+      },
+      log: (message) => logs.push(message),
+    });
+    assert.deepEqual(events, ['build', 'artifacts', 'transport', 'deploy:1.0.0:es']);
+    assert(logs.includes('Modo forzado sin control de versiones'));
+    assert(logs.includes('Version: 1.0.0'));
   });
 });

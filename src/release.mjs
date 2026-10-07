@@ -223,6 +223,34 @@ export async function runRelease({
   }
 }
 
+export async function runForcedRelease({
+  config,
+  cwd = process.cwd(),
+  build = runNpmScript,
+  findArtifacts = detectArtifacts,
+  transportFactory = createTransport,
+  deployPublication = deploy,
+  log = console.log,
+}) {
+  const packageInfo = await readPackageInfo(cwd);
+  log('Modo forzado sin control de versiones');
+  log(`Publicacion: ${config.name}`);
+  log(`Version: ${packageInfo.version}`);
+  log(`Ejecutando npm run ${config.buildScript}...`);
+  await build(config.buildScript, { cwd });
+  const artifacts = await findArtifacts(config.artifactPathPattern, config.requiredFile, { cwd });
+  log(`Artefactos detectados: ${artifacts.map(({ name }) => name).join(', ')}`);
+  const transport = transportFactory(config);
+  await deployPublication({
+    config,
+    version: packageInfo.version,
+    artifacts,
+    transport,
+    log,
+  });
+  log('\nPublicacion completada correctamente.');
+}
+
 export function inferVersionMode({ explicitMode, currentBranch, versionBranch }) {
   if (explicitMode) return explicitMode;
   return versionBranch && currentBranch === versionBranch ? 'no-version' : 'new-version';

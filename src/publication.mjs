@@ -2,8 +2,8 @@ import { posix } from 'node:path';
 import { ActivationRollbackError } from './errors.mjs';
 
 export async function publishArtifacts({ transport, artifacts, remoteDirectory, log = console.log }) {
-  if (transport.inspectDirectories && transport.uploadDirectories && transport.renameMany) {
-    return publishArtifactsBatched({ transport, artifacts, remoteDirectory, log });
+  if (transport.removeDirectories && transport.uploadDirectories && transport.normalizeDirectories && transport.activateArtifacts) {
+    return publishArtifactsOverSsh({ transport, artifacts, remoteDirectory, log });
   }
   log('Subiendo nuevas versiones...');
   for (const artifact of artifacts) {
@@ -21,23 +21,9 @@ export async function publishArtifacts({ transport, artifacts, remoteDirectory, 
   }
 }
 
-async function publishArtifactsBatched({ transport, artifacts, remoteDirectory, log }) {
-  const paths = artifacts.flatMap(({ name }) => [
-    posix.join(remoteDirectory, `${name}_new`),
-    posix.join(remoteDirectory, `${name}_old`),
-    posix.join(remoteDirectory, name),
-  ]);
-  const state = await transport.inspectDirectories(paths);
-
-  for (const { name } of artifacts) {
-    const newPath = posix.join(remoteDirectory, `${name}_new`);
-    const oldPath = posix.join(remoteDirectory, `${name}_old`);
-    if (state.get(newPath)) {
-      log(`[${name}] Eliminando resto anterior: ${name}_new`);
-      await transport.removeDirectory(newPath);
-    }
-    if (state.get(oldPath)) await transport.removeDirectory(oldPath);
-  }
+async function publishArtifactsOverSsh({ transport, artifacts, remoteDirectory, log }) {
+  const newPaths = artifacts.map(({ name }) => posix.join(remoteDirectory, `${name}_new`));
+  await transport.removeDirectories(newPaths);
 
   log('Subiendo nuevas versiones...');
   for (const { name } of artifacts) log(`[${name}] Subiendo: ${name}_new`);
@@ -46,35 +32,15 @@ async function publishArtifactsBatched({ transport, artifacts, remoteDirectory, 
     remotePath: posix.join(remoteDirectory, `${name}_new`),
   })));
 
-  const renames = [];
-  for (const { name } of artifacts) {
-    const activePath = posix.join(remoteDirectory, name);
-    const oldPath = posix.join(remoteDirectory, `${name}_old`);
-    if (state.get(activePath)) renames.push({ sourcePath: activePath, destinationPath: oldPath });
-    renames.push({ sourcePath: posix.join(remoteDirectory, `${name}_new`), destinationPath: activePath });
-  }
+  log('\nNormalizando permisos...');
+  await transport.normalizeDirectories(newPaths);
 
   log('\nActivando versiones...');
-  try {
-    await transport.renameMany(renames);
-  } catch (activationError) {
-    const afterFailure = await transport.inspectDirectories(paths);
-    const rollback = artifacts.flatMap(({ name }) => {
-      const activePath = posix.join(remoteDirectory, name);
-      const oldPath = posix.join(remoteDirectory, `${name}_old`);
-      return state.get(activePath) && !afterFailure.get(activePath) && afterFailure.get(oldPath)
-        ? [{ sourcePath: oldPath, destinationPath: activePath }]
-        : [];
-    });
-    if (rollback.length > 0) {
-      try {
-        await transport.renameMany(rollback);
-      } catch (rollbackError) {
-        throw new ActivationRollbackError('lote', activationError, rollbackError);
-      }
-    }
-    throw activationError;
-  }
+  await transport.activateArtifacts(artifacts.map(({ name }) => ({
+    activePath: posix.join(remoteDirectory, name),
+    newPath: posix.join(remoteDirectory, `${name}_new`),
+    oldPath: posix.join(remoteDirectory, `${name}_old`),
+  })));
 }
 
 async function activateArtifact(transport, remoteDirectory, name, log) {

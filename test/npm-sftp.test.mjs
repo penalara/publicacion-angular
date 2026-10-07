@@ -1,7 +1,4 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import test from 'node:test';
 import { resolveNpmInvocation } from '../src/npm-runner.mjs';
 import { SftpTransport } from '../src/transports/sftp.mjs';
@@ -16,131 +13,79 @@ test('resuelve npm mediante su CLI JavaScript en Windows', () => {
   });
 });
 
-async function createArtifact(t) {
-  const directory = await mkdtemp(join(tmpdir(), 'penalara-publicacion-'));
-  const artifact = join(directory, 'es');
-  await mkdir(join(artifact, 'assets'), { recursive: true });
-  await writeFile(join(artifact, 'index.html'), '<html></html>');
-  await writeFile(join(artifact, 'assets', 'main.js'), 'console.log(1);');
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return artifact;
+function transportWithCalls(config = {
+  sshAlias: 'web-production',
+  remoteDirectory: '/www/application',
+}) {
+  const calls = [];
+  const run = async (command, args, options = {}) => {
+    calls.push({ command, args, options });
+    return { exitCode: 0, stdout: '', stderr: '' };
+  };
+  return { calls, transport: new SftpTransport(config, run) };
 }
 
-test('SFTP usa solo comandos SFTP y normaliza permisos', async (t) => {
-  const calls = [];
-  const run = async (command, args, options = {}) => {
-    calls.push({ command, args, options });
-    return { exitCode: 0, stdout: '', stderr: '' };
-  };
-  const transport = new SftpTransport({
-    sshAlias: 'web-production',
-    remoteDirectory: '/www/application',
-  }, run);
+test('SFTP solo conecta y transfiere los artefactos', async () => {
+  const { calls, transport } = transportWithCalls();
   await transport.validatePrerequisites();
   await transport.connect();
-  const localArtifact = await createArtifact(t);
-  await transport.uploadDirectory(localArtifact, '/www/application/es_new');
-  assert.equal(calls.some(({ command }) => command === 'ssh'), false);
-  assert(calls.some(({ command, options }) =>
-    command === 'sftp' && options.input?.includes(localArtifact.replaceAll('\\', '/')),
-  ));
-  assert.equal(calls.some(({ options }) => options.input?.includes('put -p')), false);
-  assert(calls.some(({ options }) => options.input?.includes(
-    'chmod 2775 "/www/application/es_new"\nchmod 2775 "/www/application/es_new/assets"\nchmod 664 "/www/application/es_new/assets/main.js"\nchmod 664 "/www/application/es_new/index.html"\n',
-  )));
-  assert(calls.some(({ options }) => options.input === '@ls "/www/application"\n'));
+  await transport.uploadDirectories([
+    { localPath: 'C:\\build path\\es', remotePath: '/www/application/es_new' },
+    { localPath: 'C:\\build path\\en', remotePath: '/www/application/en_new' },
+  ]);
+
+  assert.deepEqual(calls.slice(0, 2).map(({ command, args }) => [command, args]), [
+    ['sftp', ['-h']],
+    ['ssh', ['-V']],
+  ]);
+  assert.equal(calls[2].command, 'sftp');
+  assert.equal(calls[2].options.input, 'cd "/www/application"\npwd\n');
+  assert.equal(calls[3].command, 'sftp');
+  assert.equal(
+    calls[3].options.input,
+    'put -R "C:/build path/es" "/www/application/es_new"\nput -R "C:/build path/en" "/www/application/en_new"\n',
+  );
+  assert.equal(calls.filter(({ command }) => command === 'sftp').some(({ options }) => /chmod|rename|rm /u.test(options.input)), false);
 });
 
-test('SFTP elimina directorios de forma recursiva', async () => {
-  const calls = [];
-  const run = async (command, args, options = {}) => {
-    calls.push({ command, args, options });
-    const input = options.input;
-    if (input === '@ls -1a "/www/application/es_new"\n') {
-      return { exitCode: 0, stdout: '.\n..\nmain.js\nassets\n', stderr: '' };
-    }
-    if (input === '@ls -1a "/www/application/es_new/assets"\n') {
-      return { exitCode: 0, stdout: 'logo.svg\n', stderr: '' };
-    }
-    if (input === 'rm "/www/application/es_new/assets"\n') {
-      return { exitCode: 1, stdout: '', stderr: 'not a file' };
-    }
-    return { exitCode: 0, stdout: '', stderr: '' };
-  };
+test('SSH elimina, normaliza, activa y restaura en comandos agrupados', async () => {
+  const { calls, transport } = transportWithCalls();
+  await transport.removeDirectories(['/www/application/es_new', '/www/application/en_new']);
+  await transport.normalizeDirectories(['/www/application/es_new', '/www/application/en_new']);
+  await transport.activateArtifacts([{
+    activePath: '/www/application/es',
+    newPath: '/www/application/es_new',
+    oldPath: '/www/application/es_old',
+  }]);
+
+  assert.equal(calls.length, 3);
+  assert(calls.every(({ command, args }) => command === 'ssh' && args[0] === '-T' && args[1] === 'web-production'));
+  assert.equal(calls[0].args[2], "rm -rf -- '/www/application/es_new' '/www/application/en_new'");
+  assert.match(calls[1].args[2], /find '\/www\/application\/es_new' -type d -exec chmod 2775 \{\} \+/u);
+  assert.match(calls[1].args[2], /find '\/www\/application\/en_new' -type f -exec chmod 664 \{\} \+/u);
+  assert.match(calls[2].args[2], /rm -rf -- '\/www\/application\/es_old'/u);
+  assert.match(calls[2].args[2], /mv -- '\/www\/application\/es' '\/www\/application\/es_old'/u);
+  assert.match(calls[2].args[2], /mv -- '\/www\/application\/es_new' '\/www\/application\/es'/u);
+  assert.match(calls[2].args[2], /mv -- '\/www\/application\/es_old' '\/www\/application\/es' \|\| exit 1/u);
+});
+
+test('SSH escapa rutas remotas con caracteres de shell', async () => {
+  const remoteDirectory = "/www/a'; touch injected";
+  const { calls, transport } = transportWithCalls({ sshAlias: 'web-production', remoteDirectory });
+  await transport.removeDirectories([`${remoteDirectory}/es_new`]);
+  assert.equal(calls[0].args[2], "rm -rf -- '/www/a'\"'\"'; touch injected/es_new'");
+});
+
+test('un fallo SSH identifica la operacion logica', async () => {
   const transport = new SftpTransport({
     sshAlias: 'web-production',
     remoteDirectory: '/www/application',
-  }, run);
-
-  await transport.removeDirectory('/www/application/es_new');
-
-  assert.deepEqual(calls.map(({ command, options }) => [command, options.input]), [
-    ['sftp', '@ls -1a "/www/application/es_new"\n'],
-    ['sftp', 'rm "/www/application/es_new/main.js"\n'],
-    ['sftp', 'rm "/www/application/es_new/assets"\n'],
-    ['sftp', '@ls -1a "/www/application/es_new/assets"\n'],
-    ['sftp', 'rm "/www/application/es_new/assets/logo.svg"\n'],
-    ['sftp', 'rmdir "/www/application/es_new/assets"\n'],
-    ['sftp', 'rmdir "/www/application/es_new"\n'],
-  ]);
-});
-
-test('SFTP acepta listados con rutas completas', async () => {
-  const remoteDirectory = '/ghcmppruebas/public_html/en_old';
-  const calls = [];
-  const run = async (command, args, options = {}) => {
-    calls.push({ command, args, options });
-    if (options.input === `@ls -1a "${remoteDirectory}"\n`) {
-      return {
-        exitCode: 0,
-        stdout: `${remoteDirectory}/.\n${remoteDirectory}/..\n${remoteDirectory}/index.html\n`,
-        stderr: '',
-      };
-    }
+  }, async (command) => {
+    if (command === 'ssh') throw new Error('Permission denied');
     return { exitCode: 0, stdout: '', stderr: '' };
-  };
-  const transport = new SftpTransport({
-    sshAlias: 'web-production',
-    remoteDirectory: '/ghcmppruebas/public_html',
-  }, run);
-
-  await transport.removeDirectory(remoteDirectory);
-
-  assert.deepEqual(calls.map(({ options }) => options.input), [
-    `@ls -1a "${remoteDirectory}"\n`,
-    `rm "${remoteDirectory}/index.html"\n`,
-    `rmdir "${remoteDirectory}"\n`,
-  ]);
-});
-
-test('SFTP agrupa inspeccion, subida, permisos y renombrados', async (t) => {
-  const calls = [];
-  const run = async (command, args, options = {}) => {
-    calls.push({ command, args, options });
-    if (options.input?.includes('pwd')) {
-      return {
-        exitCode: 0,
-        stdout: 'Remote working directory: /www/application\nRemote working directory: /www/application/es\n',
-        stderr: '',
-      };
-    }
-    return { exitCode: 0, stdout: '', stderr: '' };
-  };
-  const transport = new SftpTransport({
-    sshAlias: 'web-production',
-    remoteDirectory: '/www/application',
-  }, run);
-  const localArtifact = await createArtifact(t);
-
-  const state = await transport.inspectDirectories(['/www/application/es_new', '/www/application/es']);
-  await transport.uploadDirectories([{ localPath: localArtifact, remotePath: '/www/application/es_new' }]);
-  await transport.renameMany([{ sourcePath: '/www/application/es_new', destinationPath: '/www/application/es' }]);
-
-  assert.equal(state.get('/www/application/es_new'), false);
-  assert.equal(state.get('/www/application/es'), true);
-  assert.equal(calls[0].options.input, 'cd "/www/application"\n-cd "/www/application/es_new"\npwd\ncd "/www/application"\n-cd "/www/application/es"\npwd\ncd "/www/application"\n');
-  assert.equal(calls[1].options.input, `put -R "${localArtifact.replaceAll('\\', '/')}" "/www/application/es_new"\n`);
-  assert(calls[2].options.input.includes('chmod 2775 "/www/application/es_new"'));
-  assert(calls[2].options.input.includes('chmod 664 "/www/application/es_new/index.html"'));
-  assert.equal(calls[3].options.input, 'rename "/www/application/es_new" "/www/application/es"\n');
+  });
+  await assert.rejects(
+    transport.normalizeDirectories(['/www/application/es_new']),
+    /normalizar permisos/u,
+  );
 });
