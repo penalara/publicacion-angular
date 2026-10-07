@@ -1,6 +1,6 @@
 {
   "name": "@penalara/publicacion-angular",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Publicador configurable de aplicaciones Angular mediante SFTP y SSH",
   "type": "module",
   "bin": {
