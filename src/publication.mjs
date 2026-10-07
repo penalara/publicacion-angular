@@ -2,7 +2,7 @@ import { posix } from 'node:path';
 import { ActivationRollbackError } from './errors.mjs';
 
 export async function publishArtifacts({ transport, artifacts, remoteDirectory, log = console.log }) {
-  if (transport.removeDirectories && transport.uploadDirectories && transport.normalizeDirectories && transport.activateArtifacts) {
+  if (transport.removeDirectories && transport.uploadDirectories && transport.finalizeArtifacts) {
     return publishArtifactsOverSsh({ transport, artifacts, remoteDirectory, log });
   }
   log('Subiendo nuevas versiones...');
@@ -32,11 +32,8 @@ async function publishArtifactsOverSsh({ transport, artifacts, remoteDirectory, 
     remotePath: posix.join(remoteDirectory, `${name}_new`),
   })));
 
-  log('\nNormalizando permisos...');
-  await transport.normalizeDirectories(newPaths);
-
-  log('\nActivando versiones...');
-  await transport.activateArtifacts(artifacts.map(({ name }) => ({
+  log('\nNormalizando permisos y activando versiones...');
+  await transport.finalizeArtifacts(artifacts.map(({ name }) => ({
     activePath: posix.join(remoteDirectory, name),
     newPath: posix.join(remoteDirectory, `${name}_new`),
     oldPath: posix.join(remoteDirectory, `${name}_old`),

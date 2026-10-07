@@ -48,25 +48,31 @@ test('SFTP solo conecta y transfiere los artefactos', async () => {
   assert.equal(calls.filter(({ command }) => command === 'sftp').some(({ options }) => /chmod|rename|rm /u.test(options.input)), false);
 });
 
-test('SSH elimina, normaliza, activa y restaura en comandos agrupados', async () => {
+test('SSH elimina y finaliza permisos, activacion y restauracion en comandos agrupados', async () => {
   const { calls, transport } = transportWithCalls();
   await transport.removeDirectories(['/www/application/es_new', '/www/application/en_new']);
-  await transport.normalizeDirectories(['/www/application/es_new', '/www/application/en_new']);
-  await transport.activateArtifacts([{
-    activePath: '/www/application/es',
-    newPath: '/www/application/es_new',
-    oldPath: '/www/application/es_old',
-  }]);
+  await transport.finalizeArtifacts([
+    {
+      activePath: '/www/application/es',
+      newPath: '/www/application/es_new',
+      oldPath: '/www/application/es_old',
+    },
+    {
+      activePath: '/www/application/en',
+      newPath: '/www/application/en_new',
+      oldPath: '/www/application/en_old',
+    },
+  ]);
 
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 2);
   assert(calls.every(({ command, args }) => command === 'ssh' && args[0] === '-T' && args[1] === 'web-production'));
   assert.equal(calls[0].args[2], "rm -rf -- '/www/application/es_new' '/www/application/en_new'");
   assert.match(calls[1].args[2], /find '\/www\/application\/es_new' -type d -exec chmod 2775 \{\} \+/u);
   assert.match(calls[1].args[2], /find '\/www\/application\/en_new' -type f -exec chmod 664 \{\} \+/u);
-  assert.match(calls[2].args[2], /rm -rf -- '\/www\/application\/es_old'/u);
-  assert.match(calls[2].args[2], /mv -- '\/www\/application\/es' '\/www\/application\/es_old'/u);
-  assert.match(calls[2].args[2], /mv -- '\/www\/application\/es_new' '\/www\/application\/es'/u);
-  assert.match(calls[2].args[2], /mv -- '\/www\/application\/es_old' '\/www\/application\/es' \|\| exit 1/u);
+  assert.match(calls[1].args[2], /rm -rf -- '\/www\/application\/es_old'/u);
+  assert.match(calls[1].args[2], /mv -- '\/www\/application\/es' '\/www\/application\/es_old'/u);
+  assert.match(calls[1].args[2], /mv -- '\/www\/application\/es_new' '\/www\/application\/es'/u);
+  assert.match(calls[1].args[2], /mv -- '\/www\/application\/es_old' '\/www\/application\/es' \|\| exit 1/u);
 });
 
 test('SSH escapa rutas remotas con caracteres de shell', async () => {
@@ -85,7 +91,11 @@ test('un fallo SSH identifica la operacion logica', async () => {
     return { exitCode: 0, stdout: '', stderr: '' };
   });
   await assert.rejects(
-    transport.normalizeDirectories(['/www/application/es_new']),
-    /normalizar permisos/u,
+    transport.finalizeArtifacts([{
+      activePath: '/www/application/es',
+      newPath: '/www/application/es_new',
+      oldPath: '/www/application/es_old',
+    }]),
+    /normalizar permisos y activar/u,
   );
 });

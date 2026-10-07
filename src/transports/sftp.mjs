@@ -59,22 +59,20 @@ export class SftpTransport {
     );
   }
 
-  async normalizeDirectories(remotePaths) {
-    for (const remotePath of remotePaths) this.#assertManagedPath(remotePath);
-    const commands = ['set -e', ...remotePaths.flatMap((remotePath) => [
-      `find ${shellQuote(remotePath)} -type d -exec chmod 2775 {} +`,
-      `find ${shellQuote(remotePath)} -type f -exec chmod 664 {} +`,
-    ])];
-    await this.#ssh('normalizar permisos de las nuevas versiones', commands.join('\n'));
-  }
-
-  async activateArtifacts(entries) {
+  async finalizeArtifacts(entries) {
     for (const { activePath, newPath, oldPath } of entries) {
       this.#assertManagedPath(activePath);
       this.#assertManagedPath(newPath);
       this.#assertManagedPath(oldPath);
     }
-    const commands = ['set -e', ...entries.map(({ activePath, newPath, oldPath }) => [
+    const commands = ['set -e'];
+    for (const { newPath } of entries) {
+      commands.push(
+        `find ${shellQuote(newPath)} -type d -exec chmod 2775 {} +`,
+        `find ${shellQuote(newPath)} -type f -exec chmod 664 {} +`,
+      );
+    }
+    commands.push(...entries.map(({ activePath, newPath, oldPath }) => [
       `rm -rf -- ${shellQuote(oldPath)}`,
       `if [ -e ${shellQuote(activePath)} ]; then`,
       `  mv -- ${shellQuote(activePath)} ${shellQuote(oldPath)}`,
@@ -85,8 +83,8 @@ export class SftpTransport {
       'else',
       `  mv -- ${shellQuote(newPath)} ${shellQuote(activePath)}`,
       'fi',
-    ].join('\n'))].join('\n');
-    await this.#ssh('activar las nuevas versiones', commands);
+    ].join('\n')));
+    await this.#ssh('normalizar permisos y activar las nuevas versiones', commands.join('\n'));
   }
 
   async #sftp(commands, allowedExitCodes = [0]) {

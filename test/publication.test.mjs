@@ -25,11 +25,10 @@ class RemoteFakeTransport {
   constructor() { this.operations = []; }
   async removeDirectories(paths) { this.operations.push(['remove', paths]); }
   async uploadDirectories(entries) { this.operations.push(['upload', entries]); }
-  async normalizeDirectories(paths) {
-    this.operations.push(['permissions', paths]);
+  async finalizeArtifacts(entries) {
+    this.operations.push(['finalize', entries]);
     if (this.permissionsFail) throw new Error('chmod failed');
   }
-  async activateArtifacts(entries) { this.operations.push(['activate', entries]); }
 }
 
 const options = (transport) => ({
@@ -46,7 +45,7 @@ test('publica mediante new, activo y old', async () => {
   assert(transport.paths.has('/www/es_old'));
 });
 
-test('no activa ningun idioma hasta completar subidas y permisos SSH', async () => {
+test('no activa ningun idioma hasta completar subidas antes de la finalizacion SSH', async () => {
   const transport = new RemoteFakeTransport();
   await publishArtifacts({
     transport,
@@ -60,8 +59,7 @@ test('no activa ningun idioma hasta completar subidas y permisos SSH', async () 
   assert.deepEqual(transport.operations.map(([operation]) => operation), [
     'remove',
     'upload',
-    'permissions',
-    'activate',
+    'finalize',
   ]);
   assert.deepEqual(transport.operations[1][1], [
     { localPath: '/local/es', remotePath: '/www/es_new' },
@@ -73,7 +71,7 @@ test('un fallo al normalizar permisos impide la activacion', async () => {
   const transport = new RemoteFakeTransport();
   transport.permissionsFail = true;
   await assert.rejects(publishArtifacts(options(transport)), /chmod failed/u);
-  assert.equal(transport.operations.some(([operation]) => operation === 'activate'), false);
+  assert.equal(transport.operations.filter(([operation]) => operation === 'finalize').length, 1);
 });
 
 test('restaura el activo si falla la activacion', async () => {
