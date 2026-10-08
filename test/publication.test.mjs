@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ActivationRollbackError } from '../src/errors.mjs';
-import { publishArtifacts } from '../src/publication.mjs';
+import { deploy, publishArtifacts } from '../src/publication.mjs';
 
 class FakeTransport {
   constructor(paths = []) {
@@ -64,6 +64,35 @@ test('no activa ningun idioma hasta completar subidas antes de la finalizacion S
   assert.deepEqual(transport.operations[1][1], [
     { localPath: '/local/es', remotePath: '/www/es_new' },
     { localPath: '/local/en', remotePath: '/www/en_new' },
+  ]);
+});
+
+test('muestra siempre los hitos remotos y sus duraciones', async () => {
+  const transport = new RemoteFakeTransport();
+  transport.validatePrerequisites = async () => {};
+  transport.connect = async () => {};
+  transport.disconnect = async () => {};
+  const logs = [];
+  const times = [0, 184, 184, 9094];
+  await deploy({
+    config: { sftpConfig: { remoteDirectory: '/www' } },
+    artifacts: [
+      { name: 'en', localDirectory: '/local/en' },
+      { name: 'es', localDirectory: '/local/es' },
+      { name: 'it', localDirectory: '/local/it' },
+    ],
+    transport,
+    log: (message) => logs.push(message),
+    now: () => times.shift(),
+  });
+  assert.deepEqual(logs, [
+    'SFTP: directorio remoto validado: /www',
+    'SSH: eliminando restos en_new, es_new, it_new...',
+    'SSH: limpieza completada en 184 ms.',
+    'SFTP: subiendo 3 artefactos a *_new',
+    'SFTP: subida completada en 8.91 s.',
+    'SSH: normalizando permisos y activando versiones...',
+    'SSH: versiones anteriores conservadas como *_old',
   ]);
 });
 

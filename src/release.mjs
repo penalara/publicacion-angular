@@ -3,6 +3,7 @@ import { runNpmScript } from './npm-runner.mjs';
 import { askVersion, confirm } from './prompts.mjs';
 import { deploy } from './publication.mjs';
 import { createTransport } from './transports/index.mjs';
+import { createDebugLogger, formatDuration } from './logging.mjs';
 import { preparePackageVersion, readPackageInfo, validateVersion } from './version.mjs';
 
 function releaseTag(prefix, version) {
@@ -97,11 +98,18 @@ export async function runRelease({
   askForVersion = askVersion,
   askConfirmation = confirm,
   log = console.log,
+  debug = false,
+  now = () => performance.now(),
 }) {
+  const started = now();
+  const debugLog = createDebugLogger(log, debug);
+  debugLog('Validando workspace VCS.');
   await vcs.assertClean();
   const sourceBranch = await vcs.currentBranch();
+  debugLog(`Rama origen: ${sourceBranch}.`);
   await authorizeBranches({ config, vcs, sourceBranch, allowNonstandardSource, askConfirmation });
   const remote = config.vcs.remote || vcs.defaultRemote;
+  debugLog(`Actualizando remoto VCS: ${remote}.`);
   await vcs.fetch(remote);
   if (config.publicationBranch && !(await vcs.branchExists(config.publicationBranch, remote))) {
     throw new Error(`No existe la rama de publicacion configurada: ${config.publicationBranch}`);
@@ -152,10 +160,12 @@ export async function runRelease({
     log(`Publicacion: ${config.name}`);
     log(`Version: ${version}`);
     log(`Ejecutando npm run ${config.buildScript}...`);
+    debugLog(`Build: npm run ${config.buildScript}.`);
     await build(config.buildScript, { cwd });
     if (mode === 'new-version' && !resume) await vcs.assertOnlyPackageChanged(packageInfo.packagePath);
     else await vcs.assertClean();
 
+    debugLog('Buscando y validando artefactos.');
     const artifacts = await findArtifacts(config.artifactPathPattern, config.requiredFile, { cwd });
     log(`Artefactos detectados: ${artifacts.map(({ name }) => name).join(', ')}`);
 
@@ -177,9 +187,10 @@ export async function runRelease({
       );
     }
     const revision = await vcs.shortRevision();
-    const transport = transportFactory(config);
+    const transport = transportFactory(config, { log, debug });
+    let publicationCompleted = false;
     try {
-      await deployPublication({ config, version, revision, artifacts, transport, log });
+      await deployPublication({ config, version, revision, artifacts, transport, log, debug, now });
       const publicationState = await preparePublicationCommit({
         config,
         vcs,
@@ -202,11 +213,15 @@ export async function runRelease({
           { cause: error },
         );
       }
-      log('\nPublicacion completada correctamente.');
+      publicationCompleted = true;
     } finally {
       if (config.publicationBranch && await vcs.currentBranch() !== sourceBranch) {
         await vcs.checkout(sourceBranch, remote);
       }
+    }
+    if (publicationCompleted) {
+      log('\nPublicacion completada correctamente.');
+      log(`Duracion total: ${formatDuration(now() - started)}.`);
     }
   } catch (error) {
     if (preparedVersion && !sourcePrepared) {
@@ -231,24 +246,33 @@ export async function runForcedRelease({
   transportFactory = createTransport,
   deployPublication = deploy,
   log = console.log,
+  debug = false,
+  now = () => performance.now(),
 }) {
+  const started = now();
+  const debugLog = createDebugLogger(log, debug);
   const packageInfo = await readPackageInfo(cwd);
   log('Modo forzado sin control de versiones');
   log(`Publicacion: ${config.name}`);
   log(`Version: ${packageInfo.version}`);
   log(`Ejecutando npm run ${config.buildScript}...`);
+  debugLog(`Build: npm run ${config.buildScript}.`);
   await build(config.buildScript, { cwd });
+  debugLog('Buscando y validando artefactos.');
   const artifacts = await findArtifacts(config.artifactPathPattern, config.requiredFile, { cwd });
   log(`Artefactos detectados: ${artifacts.map(({ name }) => name).join(', ')}`);
-  const transport = transportFactory(config);
+  const transport = transportFactory(config, { log, debug });
   await deployPublication({
     config,
     version: packageInfo.version,
     artifacts,
     transport,
     log,
+    debug,
+    now,
   });
   log('\nPublicacion completada correctamente.');
+  log(`Duracion total: ${formatDuration(now() - started)}.`);
 }
 
 export function inferVersionMode({ explicitMode, currentBranch, versionBranch }) {

@@ -67,11 +67,14 @@ npm run publicar:pruebas -- --new-version 1.2.3
 npm run publicar:pruebas -- --new-version
 npm run publicar:pruebas -- --no-version
 npm run publicar:pruebas -- --no-vsc-force
+npm run publicar:pruebas -- --debug
 ```
 
 Con `--new-version` se solicita la versión cuando no se indica. Con `--no-version` se publica la versión actual de `package.json` sin crear un commit de versión ni un tag. Si no se pasa ninguno, `--no-version` es el valor predeterminado al ejecutar desde `versionBranch`; en las demás ramas se usa `--new-version`.
 
 `--no-vsc-force` publica la versión actual sin detectar ni usar Git o Mercurial. Es útil para publicar un workspace fuera de un repositorio o con cambios, pero no deja trazabilidad mediante ramas, commits, tags ni push.
+
+`--debug` añade diagnósticos de herramientas OpenSSH, fases VCS, operaciones lógicas y códigos de salida. Los hitos de conexión, limpieza, transferencia, activación y duración total se muestran siempre.
 
 Documentación detallada:
 
@@ -101,9 +104,12 @@ npm run publicar:pruebas -- --new-version 1.2.3
 npm run publicar:pruebas -- --new-version
 npm run publicar:pruebas -- --no-version
 npm run publicar:pruebas -- --no-vsc-force
+npm run publicar:pruebas -- --debug
 ```
 
 `--no-vsc-force` publishes the current version without detecting or using Git or Mercurial. It is useful outside a repository or with local changes, but creates no branch, commit, tag, or push traceability.
+
+`--debug` adds OpenSSH-tool, VCS-phase, logical-operation, and exit-code diagnostics. Connection, cleanup, transfer, activation, and total-duration milestones are always shown.
 
 Detailed documentation:
 

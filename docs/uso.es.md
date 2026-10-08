@@ -26,6 +26,7 @@ npm run publicar:pruebas -- --new-version
 npm run publicar:pruebas -- --no-version
 npm run publicar:pruebas -- --resume --new-version 2.1.0
 npm run publicar:pruebas -- --no-vsc-force
+npm run publicar:pruebas -- --debug
 ```
 
 El entorno selecciona una entrada de `publicacion.config.json`.
@@ -104,3 +105,16 @@ El push solo se ejecuta después del despliegue. Git envía atómicamente las ra
 ## 9. Automatización
 
 En CI indique siempre el modo y, para `--new-version`, la versión. Use `--allow-nonstandard-source` cuando la rama no sea estándar. No hay prompts disponibles sin TTY.
+
+## 10. Diagnóstico
+
+`--debug` añade trazas de validación de OpenSSH, fases VCS, operaciones lógicas y códigos de salida. No muestra claves, configuración SSH, scripts remotos completos ni variables de entorno.
+
+Los hitos siguientes se muestran siempre, incluso sin `--debug`:
+
+- Validación del directorio remoto SFTP.
+- Limpieza SSH de los directorios `_new` y su duración.
+- Subida SFTP de todos los artefactos y su duración.
+- Normalización de permisos y activación SSH.
+- Conservación de las versiones anteriores como `_old`.
+- Duración total de una publicación correcta.

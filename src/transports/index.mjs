@@ -1,5 +1,5 @@
 import { SftpTransport } from './sftp.mjs';
 
-export function createTransport(config) {
-  return new SftpTransport(config.sftpConfig);
+export function createTransport(config, options) {
+  return new SftpTransport(config.sftpConfig, undefined, options);
 }

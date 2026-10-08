@@ -1,9 +1,10 @@
 import { posix } from 'node:path';
 import { ActivationRollbackError } from './errors.mjs';
+import { formatDuration } from './logging.mjs';
 
-export async function publishArtifacts({ transport, artifacts, remoteDirectory, log = console.log }) {
+export async function publishArtifacts({ transport, artifacts, remoteDirectory, log = console.log, now = () => performance.now() }) {
   if (transport.removeDirectories && transport.uploadDirectories && transport.finalizeArtifacts) {
-    return publishArtifactsOverSsh({ transport, artifacts, remoteDirectory, log });
+    return publishArtifactsOverSsh({ transport, artifacts, remoteDirectory, log, now });
   }
   log('Subiendo nuevas versiones...');
   for (const artifact of artifacts) {
@@ -21,23 +22,28 @@ export async function publishArtifacts({ transport, artifacts, remoteDirectory, 
   }
 }
 
-async function publishArtifactsOverSsh({ transport, artifacts, remoteDirectory, log }) {
+async function publishArtifactsOverSsh({ transport, artifacts, remoteDirectory, log, now }) {
   const newPaths = artifacts.map(({ name }) => posix.join(remoteDirectory, `${name}_new`));
+  log(`SSH: eliminando restos ${artifacts.map(({ name }) => `${name}_new`).join(', ')}...`);
+  const cleanupStarted = now();
   await transport.removeDirectories(newPaths);
+  log(`SSH: limpieza completada en ${formatDuration(now() - cleanupStarted)}.`);
 
-  log('Subiendo nuevas versiones...');
-  for (const { name } of artifacts) log(`[${name}] Subiendo: ${name}_new`);
+  log(`SFTP: subiendo ${artifacts.length} artefactos a *_new`);
+  const uploadStarted = now();
   await transport.uploadDirectories(artifacts.map(({ name, localDirectory }) => ({
     localPath: localDirectory,
     remotePath: posix.join(remoteDirectory, `${name}_new`),
   })));
+  log(`SFTP: subida completada en ${formatDuration(now() - uploadStarted)}.`);
 
-  log('\nNormalizando permisos y activando versiones...');
+  log('SSH: normalizando permisos y activando versiones...');
   await transport.finalizeArtifacts(artifacts.map(({ name }) => ({
     activePath: posix.join(remoteDirectory, name),
     newPath: posix.join(remoteDirectory, `${name}_new`),
     oldPath: posix.join(remoteDirectory, `${name}_old`),
   })));
+  log('SSH: versiones anteriores conservadas como *_old');
 }
 
 async function activateArtifact(transport, remoteDirectory, name, log) {
@@ -92,15 +98,18 @@ async function recoverAmbiguousBackup(transport, name, activePath, oldPath, back
   });
 }
 
-export async function deploy({ config, artifacts, transport, log = console.log }) {
+export async function deploy({ config, artifacts, transport, log = console.log, now = () => performance.now(), debug = false }) {
   await transport.validatePrerequisites();
   await transport.connect();
+  log(`SFTP: directorio remoto validado: ${config.sftpConfig.remoteDirectory}`);
   try {
     await publishArtifacts({
       transport,
       artifacts,
       remoteDirectory: config.sftpConfig.remoteDirectory,
       log,
+      now,
+      debug,
     });
   } finally {
     await transport.disconnect();

@@ -7,6 +7,7 @@ export function parseArguments(args) {
   let resume = false;
   let allowNonstandardSource = false;
   let noVcsForce = false;
+  let debug = false;
   const positional = [];
   for (const argument of args) {
     if (argument === '--new-version' || argument === '--no-version') {
@@ -21,6 +22,8 @@ export function parseArguments(args) {
       allowNonstandardSource = true;
     } else if (argument === '--no-vsc-force') {
       noVcsForce = true;
+    } else if (argument === '--debug') {
+      debug = true;
     } else if (argument.startsWith('--')) {
       throw new Error(`Opcion desconocida: ${argument}`);
     } else {
@@ -29,7 +32,7 @@ export function parseArguments(args) {
   }
   if (positional.length < 1 || positional.length > 2) {
     throw new Error(
-      'Uso: penalara-publicacion <entorno> [version] [--new-version|--no-version] [--resume] [--no-vsc-force]',
+      'Uso: penalara-publicacion <entorno> [version] [--new-version|--no-version] [--resume] [--no-vsc-force] [--debug]',
     );
   }
   if (noVcsForce && explicitMode === 'new-version') {
@@ -51,6 +54,7 @@ export function parseArguments(args) {
     resume,
     allowNonstandardSource,
     noVcsForce,
+    debug,
   };
 }
 

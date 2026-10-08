@@ -13,6 +13,7 @@ test('analiza entorno, version y flags en cualquier orden', () => {
       resume: true,
       allowNonstandardSource: false,
       noVcsForce: false,
+      debug: false,
     },
   );
 });
@@ -25,6 +26,7 @@ test('acepta no-vsc-force con no-version y rechaza sus combinaciones incompatibl
     resume: false,
     allowNonstandardSource: false,
     noVcsForce: true,
+    debug: false,
   });
   assert.throws(() => parseArguments(['pruebas', '--no-vsc-force', '--new-version']), /no es compatible/u);
   assert.throws(() => parseArguments(['pruebas', '1.2.3', '--no-vsc-force']), /version posicional/u);
@@ -33,6 +35,12 @@ test('acepta no-vsc-force con no-version y rechaza sus combinaciones incompatibl
     () => parseArguments(['pruebas', '--no-vsc-force', '--allow-nonstandard-source']),
     /allow-nonstandard-source/u,
   );
+});
+
+test('acepta debug sin alterar otros modos', () => {
+  const options = parseArguments(['pruebas', '--no-version', '--debug']);
+  assert.equal(options.debug, true);
+  assert.equal(options.explicitMode, 'no-version');
 });
 
 test('no-vsc-force no crea ni consulta VCS', async () => {

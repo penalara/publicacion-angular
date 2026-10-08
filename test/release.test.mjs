@@ -257,9 +257,16 @@ test('no-vsc-force publica la version actual sin operaciones VCS', async () => {
         events.push(`deploy:${version}:${artifacts[0].name}`);
       },
       log: (message) => logs.push(message),
+      debug: true,
+      now: (() => {
+        const times = [0, 33070];
+        return () => times.shift();
+      })(),
     });
     assert.deepEqual(events, ['build', 'artifacts', 'transport', 'deploy:1.0.0:es']);
     assert(logs.includes('Modo forzado sin control de versiones'));
     assert(logs.includes('Version: 1.0.0'));
+    assert(logs.includes('[debug] Build: npm run build:testing.'));
+    assert(logs.includes('Duracion total: 33.07 s.'));
   });
 });

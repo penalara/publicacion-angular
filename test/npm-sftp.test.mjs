@@ -99,3 +99,17 @@ test('un fallo SSH identifica la operacion logica', async () => {
     /normalizar permisos y activar/u,
   );
 });
+
+test('debug muestra comandos logicos y codigos de salida sin el script remoto', async () => {
+  const logs = [];
+  const transport = new SftpTransport({
+    sshAlias: 'web-production',
+    remoteDirectory: '/www/application',
+  }, async () => ({ exitCode: 0, stdout: '', stderr: '' }), { log: (message) => logs.push(message), debug: true });
+  await transport.validatePrerequisites();
+  await transport.removeDirectories(['/www/application/es_new']);
+  assert(logs.includes('[debug] Validando ejecutable OpenSSH SFTP...'));
+  assert(logs.includes('[debug] OpenSSH SSH disponible (codigo 0).'));
+  assert(logs.includes('[debug] SSH: operacion logica: eliminar directorios de despliegue anteriores.'));
+  assert.equal(logs.some((message) => message.includes('rm -rf')), false);
+});

@@ -24,6 +24,7 @@ npm run publish:testing -- --new-version
 npm run publish:testing -- --no-version
 npm run publish:testing -- --resume --new-version 2.1.0
 npm run publish:testing -- --no-vsc-force
+npm run publish:testing -- --debug
 ```
 
 The environment selects an entry from `publicacion.config.json`.
@@ -78,3 +79,16 @@ Git pushes source branch, publication branch, and tag atomically. Mercurial perf
 ## 8. CI
 
 Always provide an explicit mode in CI and provide a version with `--new-version`. Use `--allow-nonstandard-source` for authorized nonstandard branches. Missing input fails instead of waiting when no TTY is available.
+
+## 9. Diagnostics
+
+`--debug` adds OpenSSH validation, VCS-phase, logical-operation, and exit-code traces. It never displays keys, SSH configuration, complete remote scripts, or environment variables.
+
+The following milestones are always displayed, even without `--debug`:
+
+- SFTP remote-directory validation.
+- SSH cleanup of `_new` directories and its duration.
+- SFTP upload of all artifacts and its duration.
+- SSH permission normalization and activation.
+- Retention of previous versions as `_old`.
+- Total duration of a successful publication.
