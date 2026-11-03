@@ -65,21 +65,25 @@ test('SSH elimina y finaliza permisos, activacion y restauracion en comandos agr
   ]);
 
   assert.equal(calls.length, 2);
-  assert(calls.every(({ command, args }) => command === 'ssh' && args[0] === '-T' && args[1] === 'web-production'));
-  assert.equal(calls[0].args[2], "rm -rf -- '/www/application/es_new' '/www/application/en_new'");
-  assert.match(calls[1].args[2], /find '\/www\/application\/es_new' -type d -exec chmod 2775 \{\} \+/u);
-  assert.match(calls[1].args[2], /find '\/www\/application\/en_new' -type f -exec chmod 664 \{\} \+/u);
-  assert.match(calls[1].args[2], /rm -rf -- '\/www\/application\/es_old'/u);
-  assert.match(calls[1].args[2], /mv -- '\/www\/application\/es' '\/www\/application\/es_old'/u);
-  assert.match(calls[1].args[2], /mv -- '\/www\/application\/es_new' '\/www\/application\/es'/u);
-  assert.match(calls[1].args[2], /mv -- '\/www\/application\/es_old' '\/www\/application\/es' \|\| exit 1/u);
+  for (const { command, args, options } of calls) {
+    assert.equal(command, 'ssh');
+    assert.deepEqual(args.slice(0, 3), ['-n', '-T', 'web-production']);
+    assert.equal(options.timeoutMs, 300000);
+  }
+  assert.equal(calls[0].args[3], "rm -rf -- '/www/application/es_new' '/www/application/en_new'");
+  assert.match(calls[1].args[3], /find '\/www\/application\/es_new' -type d -exec chmod 2775 \{\} \+/u);
+  assert.match(calls[1].args[3], /find '\/www\/application\/en_new' -type f -exec chmod 664 \{\} \+/u);
+  assert.match(calls[1].args[3], /rm -rf -- '\/www\/application\/es_old'/u);
+  assert.match(calls[1].args[3], /mv -- '\/www\/application\/es' '\/www\/application\/es_old'/u);
+  assert.match(calls[1].args[3], /mv -- '\/www\/application\/es_new' '\/www\/application\/es'/u);
+  assert.match(calls[1].args[3], /mv -- '\/www\/application\/es_old' '\/www\/application\/es' \|\| exit 1/u);
 });
 
 test('SSH escapa rutas remotas con caracteres de shell', async () => {
   const remoteDirectory = "/www/a'; touch injected";
   const { calls, transport } = transportWithCalls({ sshAlias: 'web-production', remoteDirectory });
   await transport.removeDirectories([`${remoteDirectory}/es_new`]);
-  assert.equal(calls[0].args[2], "rm -rf -- '/www/a'\"'\"'; touch injected/es_new'");
+  assert.equal(calls[0].args[3], "rm -rf -- '/www/a'\"'\"'; touch injected/es_new'");
 });
 
 test('un fallo SSH identifica la operacion logica', async () => {
@@ -98,6 +102,23 @@ test('un fallo SSH identifica la operacion logica', async () => {
     }]),
     /normalizar permisos y activar/u,
   );
+});
+
+test('el timeout SSH personalizado identifica la operacion y conserva la causa', async () => {
+  const timeoutError = Object.assign(new Error('timeout'), { code: 'ETIMEDOUT', timeoutMs: 1234 });
+  const transport = new SftpTransport({
+    sshAlias: 'web-production',
+    remoteDirectory: '/www/application',
+    sshTimeoutMs: 1234,
+  }, async (command, args, options) => {
+    assert.equal(options.timeoutMs, 1234);
+    throw timeoutError;
+  });
+  await assert.rejects(transport.removeDirectories(['/www/application/es_new']), (error) => {
+    assert.match(error.message, /1234 ms.*eliminar directorios/u);
+    assert.equal(error.cause, timeoutError);
+    return true;
+  });
 });
 
 test('debug muestra comandos logicos y codigos de salida sin el script remoto', async () => {

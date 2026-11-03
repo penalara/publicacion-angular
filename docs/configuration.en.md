@@ -75,12 +75,15 @@ Detected identifiers accept letters, digits, dots, hyphens, and underscores. `_n
 {
   "sftpConfig": {
     "sshAlias": "web-production",
-    "remoteDirectory": "/www/application"
+    "remoteDirectory": "/www/application",
+    "sshTimeoutMs": 300000
   }
 }
 ```
 
 SFTP and SSH reuse the same alias from the user's OpenSSH configuration. No credentials are read from or stored in the repository or npm files.
+
+`sshTimeoutMs` optionally limits each complete SSH operation (cleanup or activation), including connection time. It defaults to 300000 ms (5 minutes) and accepts integers from 1 to 2147483647. When exceeded, the local SSH process is terminated and the failed operation is reported without automatic retries. This does not guarantee that remote changes stop or are rolled back: check the remote state before publishing again. This limit does not apply to SFTP transfers. SSH runs with `-n` to avoid waiting for standard input.
 
 The alias is normally configured in `~/.ssh/config`:
 

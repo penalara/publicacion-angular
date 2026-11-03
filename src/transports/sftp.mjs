@@ -108,9 +108,14 @@ export class SftpTransport {
   async #ssh(operation, command) {
     try {
       this.#debug(`SSH: operacion logica: ${operation}.`);
-      const result = await this.#run('ssh', ['-T', this.#config.sshAlias, command]);
+      const result = await this.#run('ssh', ['-n', '-T', this.#config.sshAlias, command], {
+        timeoutMs: this.#config.sshTimeoutMs ?? 300000,
+      });
       this.#debug(`SSH: operacion completada (codigo ${result.exitCode}).`);
     } catch (error) {
+      if (error.code === 'ETIMEDOUT') {
+        throw new Error(`Se agoto el tiempo limite de ${error.timeoutMs} ms para ${operation} mediante SSH. El estado remoto puede requerir revision.`, { cause: error });
+      }
       throw new Error(`No se ha podido ${operation} mediante SSH.`, { cause: error });
     }
   }

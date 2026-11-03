@@ -48,7 +48,23 @@ test('carga la configuracion SFTP del entorno', async () => {
   await withFiles(async ({ configPath }) => {
     const config = await loadPublicationConfig('pruebas', { configPath });
     assert.equal(config.sftpConfig.sshAlias, 'web-testing');
+    assert.equal(config.sftpConfig.sshTimeoutMs, 300000);
     assert.equal(config.versionBranch, 'versions-testing');
+  });
+});
+
+test('valida y carga el timeout SSH personalizado', async () => {
+  await withFiles(async ({ configPath }) => {
+    const configured = structuredClone(baseConfig);
+    for (const value of [0, -1, 1.5, '300000', null, 2147483648]) {
+      configured.environments.pruebas.sftpConfig.sshTimeoutMs = value;
+      await writeFile(configPath, JSON.stringify(configured));
+      await assert.rejects(loadPublicationConfig('pruebas', { configPath }), /sshTimeoutMs/u);
+    }
+    configured.environments.pruebas.sftpConfig.sshTimeoutMs = 600000;
+    await writeFile(configPath, JSON.stringify(configured));
+    const config = await loadPublicationConfig('pruebas', { configPath });
+    assert.equal(config.sftpConfig.sshTimeoutMs, 600000);
   });
 });
 

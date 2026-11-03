@@ -148,6 +148,10 @@ export async function loadPublicationConfig(
     'sftpConfig.remoteDirectory',
   );
   const sshAlias = requireString(sftpConfig, 'sshAlias', `la configuracion SFTP de ${label}`);
+  const sshTimeoutMs = sftpConfig.sshTimeoutMs === undefined ? 300000 : sftpConfig.sshTimeoutMs;
+  if (!Number.isInteger(sshTimeoutMs) || sshTimeoutMs < 1 || sshTimeoutMs > 2147483647) {
+    throw new ConfigurationError('sftpConfig.sshTimeoutMs debe ser un entero entre 1 y 2147483647 milisegundos.');
+  }
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(sshAlias)) {
     throw new ConfigurationError(`sftpConfig.sshAlias de ${label} contiene caracteres no admitidos.`);
   }
@@ -162,6 +166,6 @@ export async function loadPublicationConfig(
     versionBranch,
     vcs: { type: vcsType, remote: vcsRemote },
     tagPrefix,
-    sftpConfig: { sshAlias, remoteDirectory },
+    sftpConfig: { sshAlias, remoteDirectory, sshTimeoutMs },
   };
 }
